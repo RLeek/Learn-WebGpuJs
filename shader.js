@@ -1,29 +1,26 @@
 const shaderCode = 
 `
-struct OurStruct {
-    color:vec4f,
-    offset:vec2f,
+
+struct VSOutput {
+    @builtin(position) position: vec4f,
+    @location(0) color: vec4f,
 }
-
-struct OtherStruct {
-    scale: vec2f,
-};
-
-@group(0) @binding(0) var<uniform> ourStruct:OurStruct;
-@group(0) @binding(1) var<uniform> otherStruct: OtherStruct;
 
 @vertex fn vs(
-    @builtin(vertex_index) vertexIndex : u32
-) -> @builtin(position) vec4f {
-    let pos = array(
-        vec2f(0.0, 0.5),
-        vec2f(-0.5, -0.5),
-        vec2f(0.5, -0.5)
-    );
-    return vec4f(pos[vertexIndex] * otherStruct.scale + ourStruct.offset, 0.0, 1.0);
+    @location(0) position:vec2f,
+    @location(4) perVertexColor: vec3f,
+    @location(1) color: vec4f,
+    @location(2) offset: vec2f,
+    @location(3) scale: vec2f
+) -> VSOutput {
+    var vsOut:VSOutput;
+
+    vsOut.position = vec4f(position * scale + offset, 0.0, 1.0);
+    vsOut.color = color * vec4f(perVertexColor, 1);
+    return vsOut;
 }
 
-@fragment fn fs() -> @location(0) vec4f {
-    return ourStruct.color;
+@fragment fn fs(vsOut:VSOutput) -> @location(0) vec4f {
+    return vsOut.color;
 }
 `

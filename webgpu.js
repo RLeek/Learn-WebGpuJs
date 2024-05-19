@@ -53,6 +53,30 @@ async function main() {
         layout: 'auto',
         vertex: {
             module: module,
+            buffers: [
+                {
+                    arrayStride: 2*4 +4,
+                    attributes: [
+                        {shaderLocation: 0, offset:0, format: 'float32x2'},
+                        {shaderLocation:4, offset: 8, format: 'unorm8x4'}
+                    ]
+                },
+                {
+                    arrayStride: 4+2*4,
+                    stepMode: 'instance',
+                    attributes: [
+                        {shaderLocation:1, offset: 0, format: 'unorm8x4'},
+                        {shaderLocation:2, offset: 4, format: 'float32x2'},
+                    ],
+                },
+                {
+                    arrayStride: 2*4,
+                    stepMode: 'instance',
+                    attributes: [
+                        {shaderLocation: 3, offset:0, format: 'float32x2'},
+                    ]
+                }
+            ],
         },
         fragment: {
             module: module,
@@ -73,52 +97,62 @@ async function main() {
 
     const kColorOffset = 0;
     const kScaleOffset = 0;
-    const kOffsetOffset = 4;
+    const kOffsetOffset = 1;
   
     // Define Uniform
     const objects = 100;
     const objectInfos = [];
-    const uniformBufferSize = 2*4;    
-    const staticBufferSize = 4*4 + 2 * 4 + 2*4;
+    const uniformBufferSize = 2*4 * objects;
+    const staticBufferSize = (4 + 2 * 4) * objects;
 
 
-    for (let i = 0; i< objects; i++) {    
-        const staticUniformBuffer = device.createBuffer({
-            size: staticBufferSize,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        let uniformValues = new Float32Array(staticBufferSize/4);
-        
-        uniformValues.set([random(),random(),random(),1], kColorOffset);
-        uniformValues.set([random(-0.9, 0.9), random(-0.9, 0.9)], kOffsetOffset);
-        device.queue.writeBuffer(staticUniformBuffer, 0 ,uniformValues);
+    const staticStorageBuffer = device.createBuffer({
+        label: 'storagebuffer',
+        size: staticBufferSize,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
 
-        uniformValues = new Float32Array(uniformBufferSize/4);
-        const uniformBuffer = device.createBuffer({
-            size: uniformBufferSize,
-            usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
+    const changingStorageBuffer = device.createBuffer({
+        label: 'changingStorageBuffer',
+        size:uniformBufferSize,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
 
-        const bindGroup = device.createBindGroup({
-            label: `bind group for ${i}`,
-            layout: pipeline.getBindGroupLayout(0),
-            entries: [
-                {binding: 0, resource: {buffer:staticUniformBuffer}},
-                {binding: 1, resource: {buffer:uniformBuffer}}
-            ]
-        })
+    
+    const staticVertexValuesU8 = new Uint8Array(staticBufferSize);
+    const staticVertexValuesF32 = new Float32Array(staticVertexValuesU8.buffer);
+    for (let i =0; i < objects; i++) {
+        const staticOffsetU8 = i * (4+2*4);
+        const staticOffsetF32 = staticOffsetU8/4;
+
+        staticVertexValuesU8.set([random() *255, random()*255, random()*255, 255], staticOffsetU8 + kColorOffset);
+        staticVertexValuesF32.set([random(-0.9, 0.9), random(-0.9, 0.9)], staticOffsetF32 + kOffsetOffset);
 
         objectInfos.push({
-            scale: random(0.2, 0.5),
-            uniformBuffer,
-            uniformValues,
-            bindGroup,
+            scale:random(0.2, 0.5),
         });
     }
+    device.queue.writeBuffer(staticStorageBuffer, 0, staticVertexValuesF32)
+    
+    const {vertexData, indexData, numVertices} = createCircleVertices({
+        radius: 0.5,
+        innerRadius: 0.25,
+    });
 
+    const vertexBuffer = device.createBuffer({
+        label: 'storage buffer vertices',
+        size: vertexData.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
 
-
-
+    device.queue.writeBuffer(vertexBuffer, 0, vertexData);
+    const indexBuffer = device.createBuffer({
+        label: 'index buffer',
+        size: indexData.byteLength,
+        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
+    });
+    
+    device.queue.writeBuffer(indexBuffer, 0, indexData)
 
 
     renderPassDescriptor.colorAttachments[0].view =  
@@ -127,16 +161,24 @@ async function main() {
     const encoder = device.createCommandEncoder({label: 'Our encoder'});
 
     const pass = encoder.beginRenderPass(renderPassDescriptor);
-    pass.setPipeline(pipeline);
-   
+    
     const aspect = canvas.width/canvas.height;
+    
+    const storageValues = new Float32Array(uniformBufferSize / 4);
+    objectInfos.forEach(({scale}, ndx)=> {
+        const offset = ndx *((2*4)/4);
+        storageValues.set([scale/aspect, scale], offset + kScaleOffset);
+    });
+    
+    device.queue.writeBuffer(changingStorageBuffer, 0, storageValues);
+    
+    pass.setPipeline(pipeline);
+    pass.setVertexBuffer(0, vertexBuffer);
+    pass.setVertexBuffer(1, staticStorageBuffer);
+    pass.setVertexBuffer(2, changingStorageBuffer)
+    pass.setIndexBuffer(indexBuffer, 'uint32');
+    pass.drawIndexed(numVertices, objects);
 
-    for (const {scale, bindGroup, uniformBuffer, uniformValues} of objectInfos) {
-        uniformValues.set([scale/aspect, scale], kScaleOffset);
-        device.queue.writeBuffer(uniformBuffer, 0, uniformValues);
-        pass.setBindGroup(0, bindGroup)
-        pass.draw(3);
-    }
     pass.end()
 
     const commandBuffer = encoder.finish();
@@ -155,4 +197,76 @@ function random(min, max) {
         min = 0;
     }
     return min + Math.random() * (max-min);
+}
+
+
+function createCircleVertices({
+    radius = 1,
+    numSubdivisions = 24,
+    innerRadius = 0,
+    startAngle = 0,
+    endAngle = Math.PI*2,
+} = {}) {
+  // 2 vertices at each subdivision, + 1 to wrap around the circle.
+  const numVertices = (numSubdivisions + 1) * 2;
+  // 2 32-bit values for position (xy) and 1 32-bit value for color (rgb_)
+  // The 32-bit color value will be written/read as 4 8-bit values
+  const vertexData = new Float32Array(numVertices * (2 + 1));
+  const colorData = new Uint8Array(vertexData.buffer);
+ 
+  let offset = 0;
+  let colorOffset = 8;
+  const addVertex = (x, y, r, g, b) => {
+    vertexData[offset++] = x;
+    vertexData[offset++] = y;
+    offset += 1;  // skip the color
+    colorData[colorOffset++] = r * 255;
+    colorData[colorOffset++] = g * 255;
+    colorData[colorOffset++] = b * 255;
+    colorOffset += 9;  // skip extra byte and the position
+    };
+ 
+    const innerColor = [1, 1, 1];
+    const outerColor = [0.1, 0.1, 0.1];
+    // 2 triangles per subdivision
+  //
+  // 0  2  4  6  8 ...
+  //
+  // 1  3  5  7  9 ...
+  for (let i = 0; i <= numSubdivisions; ++i) {
+    const angle = startAngle + (i + 0) * (endAngle - startAngle) / numSubdivisions;
+ 
+    const c1 = Math.cos(angle);
+    const s1 = Math.sin(angle);
+ 
+    addVertex(c1 * radius, s1 * radius, ...outerColor);
+    addVertex(c1 * innerRadius, s1 * innerRadius, ...innerColor);
+  }
+
+  const indexData = new Uint32Array(numSubdivisions * 6);
+  let ndx = 0;
+ 
+  // 0---2---4---...
+  // | //| //|
+  // |// |// |//
+  // 1---3-- 5---...
+  for (let i = 0; i < numSubdivisions; ++i) {
+    const ndxOffset = i * 2;
+ 
+    // first triangle
+    indexData[ndx++] = ndxOffset;
+    indexData[ndx++] = ndxOffset + 1;
+    indexData[ndx++] = ndxOffset + 2;
+ 
+    // second triangle
+    indexData[ndx++] = ndxOffset + 2;
+    indexData[ndx++] = ndxOffset + 1;
+    indexData[ndx++] = ndxOffset + 3;
+  }
+
+  return {
+    vertexData,
+    indexData,
+    numVertices: indexData.length,
+  };
 }
