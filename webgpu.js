@@ -1,8 +1,8 @@
 
-console.log("HELLLO!!!");
+import { cubeShaderCode } from './shader.js'
+import { vec3, mat4 } from 'https://wgpu-matrix.org/dist/2.x/wgpu-matrix.module.js';
 
-
-
+/*
 const observer = new ResizeObserver(async entries=> {
     const adapter = await navigator.gpu?.requestAdapter();
     const device = await adapter?.requestDevice();
@@ -16,177 +16,175 @@ const observer = new ResizeObserver(async entries=> {
         const height = entry.contentBoxSize[0].blockSize;
         canvas.width = Math.max(1,Math.min(width,device.limits.maxTextureDimension2D));
         canvas.height = Math.max(1, Math.min(height, device.limits.maxTextureDimension2D));
-        main();
+        render();
     }
 })
-
+*/
 const canvas = document.querySelector('canvas');
+// observer.observe(canvas);
 
-observer.observe(canvas);
+render();
 
-
-console.log("WE got here>!!!")
-
-async function main() {
+async function getDevice() {
     const adapter = await navigator.gpu?.requestAdapter();
     const device = await adapter?.requestDevice();
     if (!device) {
         fail('Need a brwoser that supports WebGPU');
         return;
     }
+    return device;
+}
 
+function getContext(device) {
     const canvas = document.querySelector('canvas');
     const context = canvas.getContext('webgpu');
+    return context;
+}
+
+
+
+async function render() {
+    const device = await getDevice();
+    const context =  getContext(device);
+    
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
     context.configure({
         device,
         format:presentationFormat
     });
 
-    const module = device.createShaderModule({
-        label: "Our shader",
-        code: shaderCode
+    const cubeModule = device.createShaderModule({
+        label: "Cube Shader",
+        code: cubeShaderCode
     })
 
-    const pipeline = device.createRenderPipeline({
-        label: 'Our pipeline',
+    const cubePipeline = device.createRenderPipeline({
+        label: 'Cube Pipeline',
         layout: 'auto',
         vertex: {
-            module: module,
+            module: cubeModule,
             buffers: [
                 {
-                    arrayStride: 2*4 +4,
+                    arrayStride: 6*4,
                     attributes: [
-                        {shaderLocation: 0, offset:0, format: 'float32x2'},
-                        {shaderLocation:4, offset: 8, format: 'unorm8x4'}
-                    ]
-                },
-                {
-                    arrayStride: 4+2*4,
-                    stepMode: 'instance',
-                    attributes: [
-                        {shaderLocation:1, offset: 0, format: 'unorm8x4'},
-                        {shaderLocation:2, offset: 4, format: 'float32x2'},
-                    ],
-                },
-                {
-                    arrayStride: 2*4,
-                    stepMode: 'instance',
-                    attributes: [
-                        {shaderLocation: 3, offset:0, format: 'float32x2'},
+                        {shaderLocation: 0, offset:0, format: 'float32x3'},
+                        {shaderLocation: 1, offset:12, format: 'float32x3'}
                     ]
                 }
             ],
         },
         fragment: {
-            module: module,
+            module: cubeModule,
             targets: [{ format: presentationFormat}]
         }
     })
 
-    const renderPassDescriptor = {
-        label: 'Our render pass',
-        colorAttachments: [
-            {
-                clearValue: [0.3, 0.3, 0.3, 1],
-                loadOp: 'clear',
-                storeOp: 'store'
-            }
-        ]
+    const cubeVertices = getCubeVertices();
+
+    const cubeVertexBuffer = device.createBuffer({
+        label: 'cubeVertexBuffer',
+        size: cubeVertices.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+
+    device.queue.writeBuffer(cubeVertexBuffer, 0, cubeVertices)
+
+    // We now need to write the uniform values
+    const modelUniformBuffer = device.createBuffer({
+        label:'modelBuffer',
+        size: 4*4*4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    })
+
+    let modelMatrix = mat4.identity();
+    modelMatrix = mat4.translate(modelMatrix, [0,0,0]);
+    modelMatrix = mat4.rotateY(modelMatrix, Math.PI * 0.75);
+    modelMatrix = mat4.rotateX(modelMatrix, Math.PI * 0.75);
+
+
+    device.queue.writeBuffer(modelUniformBuffer, 0, modelMatrix)
+
+    const viewUniformBuffer = device.createBuffer({
+        label:'viewBuffer',
+        size: 4*4*4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    })
+    
+    let viewMatrix = mat4.identity();
+
+    device.queue.writeBuffer(viewUniformBuffer, 0, viewMatrix)
+
+    const projectionUniformBuffer = device.createBuffer({
+        label:'projectionBuffer',
+        size: 4*4*4,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    })
+
+    const fov = 60 * Math.PI / 180
+    const aspect = canvas.width / canvas.height;
+    const near = 0.1;
+    const far = 1000;
+    //const projectionMatrix = mat4.perspective(fov, aspect, near, far);
+    const projectionMatrix = mat4.identity();
+    device.queue.writeBuffer(projectionUniformBuffer, 0, projectionMatrix)
+
+    let xRotation = 0.0
+    let yRotation = 0.0
+
+    while(true) {
+        //xRotation +=0.005;
+        yRotation += 0.005;
+        if (xRotation > 2) {
+            xRotation = 0;
+        }
+        if (yRotation > 2) {
+            yRotation = 0;
+        }
+        const renderPassDescriptor = {
+            label: 'Our render pass',
+            colorAttachments: [
+                {
+                    clearValue: [0.3, 0.3, 0.3, 1],
+                    loadOp: 'clear',
+                    storeOp: 'store',
+                    view: context.getCurrentTexture().createView()
+                }
+            ]
+        }
+        
+        modelMatrix = mat4.identity();
+        modelMatrix = mat4.translate(modelMatrix, [0,0,0]);
+        modelMatrix = mat4.rotateY(modelMatrix, Math.PI *xRotation);
+        modelMatrix = mat4.rotateX(modelMatrix, Math.PI * yRotation);
+
+
+        device.queue.writeBuffer(modelUniformBuffer, 0, modelMatrix)
+
+        const matrixBindGroup = device.createBindGroup({
+            label: 'matrix bind group',
+            layout: cubePipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: { buffer: modelUniformBuffer}},
+                //{ binding: 1, resource: { buffer: viewUniformBuffer}},
+                //{ binding: 2, resource: { buffer: projectionUniformBuffer}}
+            ]
+        })
+        const encoder = device.createCommandEncoder({label: 'Our encoder'});
+        const pass = encoder.beginRenderPass(renderPassDescriptor);
+
+        pass.setPipeline(cubePipeline);
+        pass.setBindGroup(0, matrixBindGroup);
+        pass.setVertexBuffer(0, cubeVertexBuffer);
+        pass.draw(cubeVertices.length/8);
+
+        pass.end()
+
+        const commandBuffer = encoder.finish();
+
+        device.queue.submit([commandBuffer]);
+        await new Promise(r => setTimeout(r, 250));
     }
-
-    const kColorOffset = 0;
-    const kScaleOffset = 0;
-    const kOffsetOffset = 1;
-  
-    // Define Uniform
-    const objects = 100;
-    const objectInfos = [];
-    const uniformBufferSize = 2*4 * objects;
-    const staticBufferSize = (4 + 2 * 4) * objects;
-
-
-    const staticStorageBuffer = device.createBuffer({
-        label: 'storagebuffer',
-        size: staticBufferSize,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-
-    const changingStorageBuffer = device.createBuffer({
-        label: 'changingStorageBuffer',
-        size:uniformBufferSize,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-
-    
-    const staticVertexValuesU8 = new Uint8Array(staticBufferSize);
-    const staticVertexValuesF32 = new Float32Array(staticVertexValuesU8.buffer);
-    for (let i =0; i < objects; i++) {
-        const staticOffsetU8 = i * (4+2*4);
-        const staticOffsetF32 = staticOffsetU8/4;
-
-        staticVertexValuesU8.set([random() *255, random()*255, random()*255, 255], staticOffsetU8 + kColorOffset);
-        staticVertexValuesF32.set([random(-0.9, 0.9), random(-0.9, 0.9)], staticOffsetF32 + kOffsetOffset);
-
-        objectInfos.push({
-            scale:random(0.2, 0.5),
-        });
-    }
-    device.queue.writeBuffer(staticStorageBuffer, 0, staticVertexValuesF32)
-    
-    const {vertexData, indexData, numVertices} = createCircleVertices({
-        radius: 0.5,
-        innerRadius: 0.25,
-    });
-
-    const vertexBuffer = device.createBuffer({
-        label: 'storage buffer vertices',
-        size: vertexData.byteLength,
-        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-    });
-
-    device.queue.writeBuffer(vertexBuffer, 0, vertexData);
-    const indexBuffer = device.createBuffer({
-        label: 'index buffer',
-        size: indexData.byteLength,
-        usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST,
-    });
-    
-    device.queue.writeBuffer(indexBuffer, 0, indexData)
-
-
-    renderPassDescriptor.colorAttachments[0].view =  
-        context.getCurrentTexture().createView();
-
-    const encoder = device.createCommandEncoder({label: 'Our encoder'});
-
-    const pass = encoder.beginRenderPass(renderPassDescriptor);
-    
-    const aspect = canvas.width/canvas.height;
-    
-    const storageValues = new Float32Array(uniformBufferSize / 4);
-    objectInfos.forEach(({scale}, ndx)=> {
-        const offset = ndx *((2*4)/4);
-        storageValues.set([scale/aspect, scale], offset + kScaleOffset);
-    });
-    
-    device.queue.writeBuffer(changingStorageBuffer, 0, storageValues);
-    
-    pass.setPipeline(pipeline);
-    pass.setVertexBuffer(0, vertexBuffer);
-    pass.setVertexBuffer(1, staticStorageBuffer);
-    pass.setVertexBuffer(2, changingStorageBuffer)
-    pass.setIndexBuffer(indexBuffer, 'uint32');
-    pass.drawIndexed(numVertices, objects);
-
-    pass.end()
-
-    const commandBuffer = encoder.finish();
-    device.queue.submit([commandBuffer]);
-
-
 }
-
 
 function random(min, max) {
     if (min === undefined) {
@@ -198,6 +196,56 @@ function random(min, max) {
     }
     return min + Math.random() * (max-min);
 }
+
+function getCubeVertices() {
+
+    const verticies = [
+        -0.5, -0.5, -0.5,  1, 0, 0,
+        0.5, -0.5, -0.5, 1, 0, 0,
+        0.5,  0.5, -0.5, 1, 0, 0,
+        0.5,  0.5, -0.5, 1, 0, 0,
+        -0.5,  0.5, -0.5, 1, 0, 0,
+        -0.5, -0.5, -0.5, 1, 0, 0,
+
+        -0.5, -0.5,  0.5, 0, 0, 1,
+        0.5, -0.5,  0.5, 0, 0, 1,
+        0.5,  0.5,  0.5, 0, 0, 1,
+        0.5,  0.5,  0.5, 0, 0, 1,
+        -0.5,  0.5,  0.5, 0, 0, 1,
+        -0.5, -0.5,  0.5, 0, 0, 1,
+
+        -0.5,  0.5,  0.5, 0, 1, 0,
+        -0.5,  0.5, -0.5, 0, 1, 0,
+        -0.5, -0.5, -0.5, 0, 1, 0,
+        -0.5, -0.5, -0.5, 0, 1, 0,
+        -0.5, -0.5,  0.5, 0, 1, 0,
+        -0.5,  0.5,  0.5, 0, 1, 0,
+
+        0.5,  0.5,  0.5, 0.5, 0, 0,
+        0.5,  0.5, -0.5, 0.5, 0, 0,
+        0.5, -0.5, -0.5, 0.5, 0, 0,
+        0.5, -0.5, -0.5, 0.5, 0, 0,
+        0.5, -0.5,  0.5, 0.5, 0, 0,
+        0.5,  0.5,  0.5, 0.5, 0, 0,
+
+        -0.5, -0.5, -0.5, 0, 0, 0.5,
+        0.5, -0.5, -0.5, 0, 0, 0.5,
+        0.5, -0.5,  0.5, 0, 0, 0.5,
+        0.5, -0.5,  0.5, 0, 0, 0.5,
+        -0.5, -0.5,  0.5, 0, 0, 0.5,
+        -0.5, -0.5, -0.5, 0, 0, 0.5,
+
+        -0.5,  0.5, -0.5, 0, 0.5, 1,
+        0.5,  0.5, -0.5, 0, 0.5, 1,
+        0.5,  0.5,  0.5, 0, 0.5, 1,
+        0.5,  0.5,  0.5, 0, 0.5, 1,
+        -0.5,  0.5,  0.5, 0, 0.5, 1,
+        -0.5,  0.5, -0.5, 0, 0.5, 1,
+    ]
+    
+    return new Float32Array(verticies);
+}
+
 
 
 function createCircleVertices({
