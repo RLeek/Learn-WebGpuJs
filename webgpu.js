@@ -116,7 +116,7 @@ async function render() {
     })
     
     let viewMatrix = mat4.identity();
-    viewMatrix = mat4.translate(viewMatrix, [0,0,-2]);
+    viewMatrix = mat4.translate(viewMatrix, [0,0,-8]);
 
     device.queue.writeBuffer(viewUniformBuffer, 0, viewMatrix)
 
@@ -220,7 +220,152 @@ function random(min, max) {
     return min + Math.random() * (max-min);
 }
 
+
+
+
 function getCubeVertices() {
+
+    const block = Object.freeze({
+        air: 0,
+        dirt: 1,
+    })
+
+    const width = 3;
+    const height = 3;
+    const length = 3;
+
+    // world is just an array, first 3 correspend to width,
+    // next correspond to length
+    // next*next correspond to height
+    const world = [
+        block.dirt, block.dirt, block.dirt,
+        block.air, block.dirt, block.air,
+        block.air, block.air, block.air,
+        block.dirt, block.air, block.dirt,
+        block.air, block.air, block.dirt,
+        block.air, block.dirt, block.air,
+        block.dirt, block.air, block.air,
+        block.air, block.air, block.air,
+        block.air, block.air, block.air
+    ]
+
+    var vertices = [];
+
+
+    // Now need to figure out how to populate a list of verticies
+    // from this
+
+    // We are assuming that blocks have a length of 1 here, right?
+    for (let currHeight = 0; currHeight < height; currHeight++) { // z
+        for (let currWidth = 0; currWidth < width; currWidth++) { // y
+            for (let currLength = 0; currLength < length; currLength++) { // x
+                let blockLoc = currLength + currWidth*length + currHeight * length * width;
+                let blockType = world[blockLoc]
+                if (blockType == block.air) {
+                    continue;
+                }
+
+                // starting position
+                let position = [currLength, currWidth, currHeight]
+
+                // Need to check top, bottom, left, right, front and back are air blocks
+                // or out of range
+
+                let blockTopLoc =  currLength + currWidth*length + (currHeight+1) * length * width;
+                if (isEmpty(blockTopLoc, world)) {
+                    // draw surface
+                    vertices = vertices.concat([
+                        position[0]+-0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 1,
+                        position[0]+0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 1,
+                        position[0]+0.5, position[1]+ 0.5,  position[2]+0.5, 1, 0, 1,
+                        position[0]+0.5,  position[1]+0.5,  position[2]+0.5, 1, 0, 1,
+                        position[0]+-0.5,  position[1]+0.5,  position[2]+0.5, 1, 0, 1,
+                        position[0]+-0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 1
+                    ]);
+                }
+
+                let blockBottomLoc =  currLength + currWidth*length + (currHeight-1) * length * width;
+                if (isEmpty(blockBottomLoc, world)) {
+                    // draw surface
+                    vertices =vertices.concat([
+                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5, 0, 1, 1,
+                        position[0]+0.5, position[1]+-0.5, position[2]+-0.5, 0, 1, 1,
+                        position[0]+0.5, position[1]+-0.5,  position[2]+0.5, 0, 1, 1,
+                
+                        position[0]+0.5, position[1]+-0.5,  position[2]+0.5, 0, 1, 1,
+                        position[0]+-0.5, position[1]+-0.5,  position[2]+0.5, 0, 1, 1,
+                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5, 0, 1, 1,
+                    ])
+                }
+
+                let blockFrontLoc =  currLength + (currWidth+1)*length + currHeight * length * width;
+                if (isEmpty(blockFrontLoc, world)) {
+                    // draw surface
+                    vertices =vertices.concat([
+                        position[0]+-0.5, position[1]+-0.5,  position[2]+0.5, 0, 0, 1,
+                        position[0]+0.5, position[1]+-0.5, position[2]+ 0.5, 0, 0, 1,
+                        position[0]+0.5,  position[1]+0.5,  position[2]+0.5, 0, 0, 1,
+                        position[0]+0.5,  position[1]+0.5,  position[2]+0.5, 0, 0, 1,
+                        position[0]+-0.5,  position[1]+0.5,  position[2]+0.5, 0, 0, 1,
+                        position[0]+-0.5, position[1]+-0.5,  position[2]+0.5, 0, 0, 1,
+                    ])
+                }
+
+                let blockBackLoc =  currLength + (currWidth-1)*length + currHeight * length * width;
+                if (isEmpty(blockBackLoc, world)) {
+                    // draw surface
+                    vertices =vertices.concat([
+                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5,  1, 0, 0,
+                        position[0]+0.5, position[1]+-0.5, position[2]+-0.5, 1, 0, 0,
+                        position[0]+0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 0,
+                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5, 1, 0, 0,
+                        position[0]+0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 0,
+                        position[0]+-0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 0,
+                    ])
+                }
+
+                let blockLeftLoc =  (currLength+1) + currWidth*length + currHeight * length * width;
+                if (isEmpty(blockLeftLoc, world)) {
+                    // draw surface
+                    vertices =vertices.concat([
+                        position[0]+-0.5,  position[1]+0.5,  position[2]+0.5, 0, 1, 0,
+                        position[0]+-0.5,  position[1]+0.5, position[2]+-0.5, 0, 1, 0,
+                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5, 0, 1, 0,
+                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5, 0, 1, 0,
+                        position[0]+-0.5, position[1]+-0.5,  position[2]+0.5, 0, 1, 0,
+                        position[0]+-0.5,  position[1]+0.5,  position[2]+0.5, 0, 1, 0,
+                    ])
+                }
+
+                let blockRighLoc =  (currLength-1) + currWidth*length + currHeight * length * width;
+                if (isEmpty(blockRighLoc, world)) {
+                    // draw surface
+                    vertices =vertices.concat([
+                        position[0]+0.5,  position[1]+0.5,  position[2]+0.5, 1, 1, 0,
+                        position[0]+0.5,  position[1]+0.5, position[2]+-0.5, 1, 1, 0,
+                        position[0]+0.5, position[1]+-0.5, position[2]+-0.5, 1, 1, 0,
+                        position[0]+0.5, position[1]+-0.5, position[2]+-0.5, 1, 1, 0,
+                        position[0]+0.5, position[1]+-0.5,  position[2]+0.5, 1, 1, 0,
+                        position[0]+0.5, position[1]+ 0.5,  position[2]+0.5, 1, 1, 0,                
+                    ])
+                }
+            }
+        }
+    }
+
+    function isEmpty(index, world) {
+        if (index < 0) {
+            return true
+        }
+        if (index > length *width *height) {
+            return true
+        }
+
+        if (world[index] == block.air) {
+            return true
+        }
+        return false;
+    }
 
     const verticies = [
         // Back
@@ -273,7 +418,8 @@ function getCubeVertices() {
         -0.5,  0.5, -0.5, 1, 0, 1,
     ]
     
-    return new Float32Array(verticies);
+    console.log(vertices)
+    return new Float32Array(vertices);
 }
 
 
