@@ -2,8 +2,8 @@
 export const cubeShaderCode=
 `
 @group(0) @binding(0) var<uniform> model:mat4x4f;
-// @group(0) @binding(1) var<uniform> view:mat4x4f;
-// @group(0) @binding(2) var<uniform> projection:mat4x4f;
+@group(0) @binding(1) var<uniform> view:mat4x4f;
+@group(0) @binding(2) var<uniform> projection:mat4x4f;
 
 struct vs_output {
     @builtin(position) position: vec4f,
@@ -16,7 +16,7 @@ struct vs_output {
     @location(1) color:vec3f,
 ) -> vs_output {
     var output: vs_output;
-    output.position = model*vec4(vertex,1.0);
+    output.position = projection* view * model*vec4(vertex,1.0);
     output.color = color;
     return output;
 }

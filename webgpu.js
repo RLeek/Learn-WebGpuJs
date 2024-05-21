@@ -76,7 +76,12 @@ async function render() {
         fragment: {
             module: cubeModule,
             targets: [{ format: presentationFormat}]
-        }
+        },
+        depthStencil: {
+            depthWriteEnabled: true,
+            depthCompare: 'less',
+            format: 'depth24plus',
+        },
     })
 
     const cubeVertices = getCubeVertices();
@@ -111,6 +116,7 @@ async function render() {
     })
     
     let viewMatrix = mat4.identity();
+    viewMatrix = mat4.translate(viewMatrix, [0,0,-2]);
 
     device.queue.writeBuffer(viewUniformBuffer, 0, viewMatrix)
 
@@ -124,16 +130,27 @@ async function render() {
     const aspect = canvas.width / canvas.height;
     const near = 0.1;
     const far = 1000;
-    //const projectionMatrix = mat4.perspective(fov, aspect, near, far);
-    const projectionMatrix = mat4.identity();
+    const projectionMatrix = mat4.perspective(fov, aspect, near, far);
     device.queue.writeBuffer(projectionUniformBuffer, 0, projectionMatrix)
 
     let xRotation = 0.0
     let yRotation = 0.0
 
+    
     while(true) {
-        //xRotation +=0.005;
-        yRotation += 0.005;
+        let canvasTexture = context.getCurrentTexture();
+        let depthTexture = device.createTexture({
+            label: 'Depth texture',
+            size: [canvasTexture.width, canvasTexture.height],
+            format: 'depth24plus',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT,
+        });
+        
+        let canvasView = canvasTexture.createView();
+        let depthview = depthTexture.createView();
+        
+        xRotation += 0.0005;
+        yRotation += 0.0005;
         if (xRotation > 2) {
             xRotation = 0;
         }
@@ -147,9 +164,15 @@ async function render() {
                     clearValue: [0.3, 0.3, 0.3, 1],
                     loadOp: 'clear',
                     storeOp: 'store',
-                    view: context.getCurrentTexture().createView()
+                    view: canvasView
                 }
-            ]
+            ],
+            depthStencilAttachment: {
+                depthClearValue: 1.0,
+                depthLoadOp: 'clear',
+                depthStoreOp: 'store',
+                view: depthview
+            }
         }
         
         modelMatrix = mat4.identity();
@@ -165,8 +188,8 @@ async function render() {
             layout: cubePipeline.getBindGroupLayout(0),
             entries: [
                 { binding: 0, resource: { buffer: modelUniformBuffer}},
-                //{ binding: 1, resource: { buffer: viewUniformBuffer}},
-                //{ binding: 2, resource: { buffer: projectionUniformBuffer}}
+                { binding: 1, resource: { buffer: viewUniformBuffer}},
+                { binding: 2, resource: { buffer: projectionUniformBuffer}}
             ]
         })
         const encoder = device.createCommandEncoder({label: 'Our encoder'});
@@ -175,14 +198,14 @@ async function render() {
         pass.setPipeline(cubePipeline);
         pass.setBindGroup(0, matrixBindGroup);
         pass.setVertexBuffer(0, cubeVertexBuffer);
-        pass.draw(cubeVertices.length/8);
+        pass.draw(cubeVertices.length/6);
 
         pass.end()
 
         const commandBuffer = encoder.finish();
 
         device.queue.submit([commandBuffer]);
-        await new Promise(r => setTimeout(r, 250));
+        await new Promise(r => setTimeout(r, 2));
     }
 }
 
@@ -200,13 +223,15 @@ function random(min, max) {
 function getCubeVertices() {
 
     const verticies = [
+        // Back
         -0.5, -0.5, -0.5,  1, 0, 0,
         0.5, -0.5, -0.5, 1, 0, 0,
         0.5,  0.5, -0.5, 1, 0, 0,
+        -0.5, -0.5, -0.5, 1, 0, 0,
         0.5,  0.5, -0.5, 1, 0, 0,
         -0.5,  0.5, -0.5, 1, 0, 0,
-        -0.5, -0.5, -0.5, 1, 0, 0,
 
+        // Front
         -0.5, -0.5,  0.5, 0, 0, 1,
         0.5, -0.5,  0.5, 0, 0, 1,
         0.5,  0.5,  0.5, 0, 0, 1,
@@ -214,6 +239,7 @@ function getCubeVertices() {
         -0.5,  0.5,  0.5, 0, 0, 1,
         -0.5, -0.5,  0.5, 0, 0, 1,
 
+        // Left
         -0.5,  0.5,  0.5, 0, 1, 0,
         -0.5,  0.5, -0.5, 0, 1, 0,
         -0.5, -0.5, -0.5, 0, 1, 0,
@@ -221,26 +247,30 @@ function getCubeVertices() {
         -0.5, -0.5,  0.5, 0, 1, 0,
         -0.5,  0.5,  0.5, 0, 1, 0,
 
-        0.5,  0.5,  0.5, 0.5, 0, 0,
-        0.5,  0.5, -0.5, 0.5, 0, 0,
-        0.5, -0.5, -0.5, 0.5, 0, 0,
-        0.5, -0.5, -0.5, 0.5, 0, 0,
-        0.5, -0.5,  0.5, 0.5, 0, 0,
-        0.5,  0.5,  0.5, 0.5, 0, 0,
+        // Right
+        0.5,  0.5,  0.5, 1, 1, 0,
+        0.5,  0.5, -0.5, 1, 1, 0,
+        0.5, -0.5, -0.5, 1, 1, 0,
+        0.5, -0.5, -0.5, 1, 1, 0,
+        0.5, -0.5,  0.5, 1, 1, 0,
+        0.5,  0.5,  0.5, 1, 1, 0,
 
-        -0.5, -0.5, -0.5, 0, 0, 0.5,
-        0.5, -0.5, -0.5, 0, 0, 0.5,
-        0.5, -0.5,  0.5, 0, 0, 0.5,
-        0.5, -0.5,  0.5, 0, 0, 0.5,
-        -0.5, -0.5,  0.5, 0, 0, 0.5,
-        -0.5, -0.5, -0.5, 0, 0, 0.5,
+        // Bottom
+        -0.5, -0.5, -0.5, 0, 1, 1,
+        0.5, -0.5, -0.5, 0, 1, 1,
+        0.5, -0.5,  0.5, 0, 1, 1,
 
-        -0.5,  0.5, -0.5, 0, 0.5, 1,
-        0.5,  0.5, -0.5, 0, 0.5, 1,
-        0.5,  0.5,  0.5, 0, 0.5, 1,
-        0.5,  0.5,  0.5, 0, 0.5, 1,
-        -0.5,  0.5,  0.5, 0, 0.5, 1,
-        -0.5,  0.5, -0.5, 0, 0.5, 1,
+        0.5, -0.5,  0.5, 0, 1, 1,
+        -0.5, -0.5,  0.5, 0, 1, 1,
+        -0.5, -0.5, -0.5, 0, 1, 1,
+
+        // top
+        -0.5,  0.5, -0.5, 1, 0, 1,
+        0.5,  0.5, -0.5, 1, 0, 1,
+        0.5,  0.5,  0.5, 1, 0, 1,
+        0.5,  0.5,  0.5, 1, 0, 1,
+        -0.5,  0.5,  0.5, 1, 0, 1,
+        -0.5,  0.5, -0.5, 1, 0, 1,
     ]
     
     return new Float32Array(verticies);
