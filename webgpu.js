@@ -1,5 +1,5 @@
 
-import { cubeShaderCode } from './shader.js'
+import { cubeShaderCode, worldShaderCode } from './shader.js'
 import { vec3, mat4 } from 'https://wgpu-matrix.org/dist/2.x/wgpu-matrix.module.js';
 
 /*
@@ -22,6 +22,14 @@ const observer = new ResizeObserver(async entries=> {
 */
 const canvas = document.querySelector('canvas');
 // observer.observe(canvas);
+
+canvas.addEventListener('mousemove', event => {
+    const bb = canvas.getBoundingClientRect();
+    const x = Math.floor((event.clientX - bb.left)/bb.width * canvas.width)
+    const y = Math.floor((event.clientY-bb.top)/ bb.height * canvas.height)
+    console.log(x,y)
+})
+
 
 render();
 
@@ -52,6 +60,37 @@ async function render() {
         device,
         format:presentationFormat
     });
+
+    const worldModule = device.createShaderModule({
+        label: "Cube Shader",
+        code: worldShaderCode
+    })
+
+    const worldPipeline = device.createRenderPipeline({
+        label: 'Cube Pipeline',
+        layout: 'auto',
+        vertex: {
+            module: worldModule,
+            buffers: [
+                {
+                    arrayStride: 6*4,
+                    attributes: [
+                        {shaderLocation: 0, offset:0, format: 'float32x3'},
+                        {shaderLocation: 1, offset:12, format: 'float32x3'}
+                    ]
+                }
+            ],
+        },
+        fragment: {
+            module: worldModule,
+            targets: [{ format: presentationFormat}]
+        },
+        depthStencil: {
+            depthWriteEnabled: true,
+            depthCompare: 'less',
+            format: 'depth24plus',
+        },
+    })
 
     const cubeModule = device.createShaderModule({
         label: "Cube Shader",
@@ -137,6 +176,14 @@ async function render() {
     let yRotation = 0.0
 
     
+    const pickBuffer = device.createBuffer({
+        size: 3 * 4,
+        usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
+    });
+    
+
+
+
     while(true) {
         let canvasTexture = context.getCurrentTexture();
         let depthTexture = device.createTexture({
@@ -157,6 +204,8 @@ async function render() {
         if (yRotation > 2) {
             yRotation = 0;
         }
+
+        // Is this creating the framebuffer equivalent??
         const renderPassDescriptor = {
             label: 'Our render pass',
             colorAttachments: [
@@ -179,8 +228,6 @@ async function render() {
         modelMatrix = mat4.translate(modelMatrix, [0,0,0]);
         modelMatrix = mat4.rotateY(modelMatrix, Math.PI *xRotation);
         modelMatrix = mat4.rotateX(modelMatrix, Math.PI * yRotation);
-
-
         device.queue.writeBuffer(modelUniformBuffer, 0, modelMatrix)
 
         const matrixBindGroup = device.createBindGroup({
@@ -203,11 +250,103 @@ async function render() {
         pass.end()
 
         const commandBuffer = encoder.finish();
-
         device.queue.submit([commandBuffer]);
+
+
+        await getWorldMouseClick(canvasTexture,device,worldPipeline,cubeVertexBuffer,pickBuffer,cubeVertices,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer);
+
+
+
+
+
         await new Promise(r => setTimeout(r, 2));
     }
 }
+
+
+
+
+async function getWorldMouseClick(canvasTexture,device,worldPipeline,cubeVertexBuffer,pickBuffer,cubeVertices,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer) {
+    let depthTexture = device.createTexture({
+        label: 'Depth texture',
+        size: [canvasTexture.width, canvasTexture.height],
+        format: 'depth24plus',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+    let selectionTexture = device.createTexture({
+        label: 'Selection texture',
+        size: [canvasTexture.width, canvasTexture.height],
+        format: 'bgra8unorm',
+        usage: GPUTextureUsage.COPY_SRC |GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+
+    const matrixBindGroup = device.createBindGroup({
+        label: 'matrix bind group',
+        layout: worldPipeline.getBindGroupLayout(0),
+        entries: [
+            { binding: 0, resource: { buffer: modelUniformBuffer}},
+            { binding: 1, resource: { buffer: viewUniformBuffer}},
+            { binding: 2, resource: { buffer: projectionUniformBuffer}}
+        ]
+    })
+
+    const pickRenderPassDescriptorDescriptor = {
+        label: 'Our render pass',
+        colorAttachments: [
+            {
+                clearValue: [0, 0, 0, 0],
+                loadOp: 'clear',
+                storeOp: 'store',
+                view: selectionTexture.createView()
+            }
+        ],
+        depthStencilAttachment: {
+            depthClearValue: 1.0,
+            depthLoadOp: 'clear',
+            depthStoreOp: 'store',
+            view: depthTexture.createView()
+        }
+    }
+    
+    const encoder = device.createCommandEncoder({label: 'Our123 encoder'});
+    const pass = encoder.beginRenderPass(pickRenderPassDescriptorDescriptor);
+
+    pass.setPipeline(worldPipeline);
+    pass.setBindGroup(0, matrixBindGroup);
+    pass.setVertexBuffer(0, cubeVertexBuffer);
+    pass.draw(cubeVertices.length/6);
+
+    pass.end()
+
+    encoder.copyTextureToBuffer({
+        texture: selectionTexture,
+        // mipLevel: 0,
+        origin: {
+          x: 100,
+          y: 27,
+        }
+  
+      }, {
+        buffer: pickBuffer,
+        //bytesPerRow: ((3 * 4 + 255) | 0) * 256,
+        //rowsPerImage: 3,
+      }, {
+        width: 1
+        // height: 1,
+        // depth: 1,
+    });
+      
+    const commandBuffer = encoder.finish();
+    device.queue.submit([commandBuffer]);
+
+    await pickBuffer.mapAsync(GPUMapMode.READ);
+    const values = new Uint8Array(pickBuffer.getMappedRange());
+    console.log("Values:" + values[0] + ","+ values[1] + ","+ values[2]);
+    // console.log(values[1]);
+    // console.log(values[2]);
+    pickBuffer.unmap();
+}
+
 
 function random(min, max) {
     if (min === undefined) {
