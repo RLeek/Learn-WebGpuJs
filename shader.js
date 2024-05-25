@@ -49,8 +49,8 @@ struct vs_output {
     return output;
 }
 
-@fragment fn fs(output:vs_output) -> @location(0) vec4f {
-    return vec4(0.5,0.3,0.2, 1.0);
+@fragment fn fs(output:vs_output) -> @location(0) vec4u	 {
+    return vec4(20,255,6, 255);
 }
 
 `
