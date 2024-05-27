@@ -38,15 +38,20 @@ export const camera = class {
 
     // still doesn't work
     handleMouseDrag(x, y) {
-        this.yaw += x;
-        this.pitch += y;
+        this.yaw += x * 0.01;
+        this.pitch += y * 0.01;
 
-        this.yaw = mod(this.yaw, Math.PI*2);
-        this.pitch = clamp(this.pitch, -Math.PI/2, Math.PI/2);
+        //this.yaw = this.yaw % (Math.PI*2);
+        this.yaw = this.yaw % (Math.PI*2)
+        this.pitch = Math.min(Math.max(this.pitch, -Math.PI/2+ 0.1), Math.PI/2-0.1)
+
 
         this.front[0] = Math.cos(this.yaw) * Math.cos(this.pitch);
         this.front[1] = Math.sin(this.pitch)
         this.front[2] = Math.sin(this.yaw) * Math.cos(this.pitch)
+        this.front = vec3.normalize(this.front)
+        this.right = vec3.normalize(vec3.cross(this.front, this.up));
+        console.log(this.pitch);
     }
 
     getViewMatrix() {

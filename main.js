@@ -186,31 +186,27 @@ async function main() {
         if (inputHandler.wPressed === true) {
             // update camera view matrix
             worldCamera.forward();
-            device.queue.writeBuffer(viewUniformBuffer, 0, worldCamera.getViewMatrix())
         }
 
         if (inputHandler.sPressed === true) {
             worldCamera.backward();
-            device.queue.writeBuffer(viewUniformBuffer, 0, worldCamera.getViewMatrix())
         }
         
         if (inputHandler.dPressed === true) {
             worldCamera.strafeRight();
-            device.queue.writeBuffer(viewUniformBuffer, 0, worldCamera.getViewMatrix())
         }
 
         if (inputHandler.aPressed === true) {
             worldCamera.strafeLeft();
-            device.queue.writeBuffer(viewUniformBuffer, 0, worldCamera.getViewMatrix())
         }
-
+        
         if (inputHandler.rightMouseDragged == true || inputHandler.mouseMove.x != 0 || inputHandler.mouseMove.y != 0) {
-            console.log("We are doing a drags")
-            worldCamera.handleMouseDrag(mouse.x, mouse.y);
+            worldCamera.handleMouseDrag(inputHandler.mouseMove.x, -inputHandler.mouseMove.y);
             inputHandler.mouseMove.x = 0;
             inputHandler.mouseMove.y = 0;
         }
-
+        
+        device.queue.writeBuffer(viewUniformBuffer, 0, worldCamera.getViewMatrix())
 
         let canvasTexture = context.getCurrentTexture();
         let depthTexture = device.createTexture({
