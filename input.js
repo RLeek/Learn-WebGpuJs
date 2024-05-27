@@ -45,7 +45,6 @@ export const inputHandler = {
     },
 
     setMousePressed: function (e, self) {
-        console.log(e);
         if (e.button == 2) {
             self.rightMousePressed = true;
         }
@@ -54,7 +53,6 @@ export const inputHandler = {
     },
 
     setMouseReleased: function (e, self) {
-        console.log(e);
         if (e.button == 2) {
             self.rightMousePressed = false;
             self.mouseDragged = false

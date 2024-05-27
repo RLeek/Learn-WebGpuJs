@@ -3,7 +3,7 @@ import { cubeShaderCode, worldShaderCode } from './shader.js'
 import { camera } from './camera.js'
 import { vec3, mat4 } from 'https://wgpu-matrix.org/dist/2.x/wgpu-matrix.module.js';
 import { inputHandler } from './input.js';
-
+import { world } from './world.js'
 
 async function getDevice() {
     const adapter = await navigator.gpu?.requestAdapter();
@@ -48,10 +48,10 @@ function getWorldPipeline(device) {
             module: worldModule,
             buffers: [
                 {
-                    arrayStride: 6*4,
+                    arrayStride: 7*4,
                     attributes: [
                         {shaderLocation: 0, offset:0, format: 'float32x3'},
-                        {shaderLocation: 1, offset:12, format: 'float32x3'}
+                        {shaderLocation: 1, offset:12, format: 'uint32x4'}
                     ]
                 }
             ],
@@ -121,7 +121,9 @@ async function main() {
     const cubePipeline = getCubePipeline(device, presentationFormat)
 
     // Initialize world here
-    const cubeVertices = getCubeVertices();
+    const voxelWorld = new world(20, 20, 20);
+    const cubeVertices = voxelWorld.getVertices();
+    const indexCubeVertices = voxelWorld.getIndexVertices();
 
     
     // Creates shared vertex buffer
@@ -133,6 +135,16 @@ async function main() {
     
     device.queue.writeBuffer(cubeVertexBuffer, 0, cubeVertices)
     
+    // Creates shared vertex buffer
+    const cubeIndexVertexBuffer = device.createBuffer({
+        label: 'cubeIndexVertexBuffer',
+        size: indexCubeVertices.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    
+    device.queue.writeBuffer(cubeIndexVertexBuffer, 0, indexCubeVertices)
+    
+
     // Creates shared model matrix
     const modelUniformBuffer = device.createBuffer({
         label:'modelBuffer',
@@ -142,8 +154,6 @@ async function main() {
     
     let modelMatrix = mat4.identity();
     modelMatrix = mat4.translate(modelMatrix, [0,0,0]);
-    modelMatrix = mat4.rotateY(modelMatrix, Math.PI * 0.75);
-    modelMatrix = mat4.rotateX(modelMatrix, Math.PI * 0.75);
     
     device.queue.writeBuffer(modelUniformBuffer, 0, modelMatrix)
     
@@ -178,10 +188,6 @@ async function main() {
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     });
     
-    
-    let xRotation = 0.0
-    let yRotation = 0.0
-
     async function render() {
         if (inputHandler.wPressed === true) {
             // update camera view matrix
@@ -218,15 +224,6 @@ async function main() {
         
         let canvasView = canvasTexture.createView();
         let depthview = depthTexture.createView();
-        
-        xRotation += 0.0005;
-        yRotation += 0.0005;
-        if (xRotation > 2) {
-            xRotation = 0;
-        }
-        if (yRotation > 2) {
-            yRotation = 0;
-        }
 
         // Is this creating the framebuffer equivalent??
         const renderPassDescriptor = {
@@ -247,12 +244,6 @@ async function main() {
             }
         }
         
-        modelMatrix = mat4.identity();
-        modelMatrix = mat4.translate(modelMatrix, [0,0,0]);
-        modelMatrix = mat4.rotateY(modelMatrix, Math.PI *xRotation);
-        modelMatrix = mat4.rotateX(modelMatrix, Math.PI * yRotation);
-        device.queue.writeBuffer(modelUniformBuffer, 0, modelMatrix)
-
         const matrixBindGroup = device.createBindGroup({
             label: 'matrix bind group',
             layout: cubePipeline.getBindGroupLayout(0),
@@ -284,8 +275,7 @@ async function main() {
         const bb = canvas.getBoundingClientRect();
         const x = Math.floor((event.clientX - bb.left)/bb.width * canvas.width)
         const y = Math.floor((event.clientY-bb.top)/ bb.height * canvas.height)
-        console.log(x,y)
-        await getWorldMouseClick(canvas,device,worldPipeline,cubeVertexBuffer,pickBuffer,cubeVertices,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer, x, y);
+        await getWorldMouseClick(canvas,device,worldPipeline, indexCubeVertices, cubeIndexVertexBuffer,pickBuffer,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer, x, y);
     })
 
 
@@ -330,7 +320,7 @@ main();
 
 
 
-async function getWorldMouseClick(canvasTexture,device,worldPipeline,cubeVertexBuffer,pickBuffer,cubeVertices,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer, x, y) {
+async function getWorldMouseClick(canvasTexture,device,worldPipeline,indexCubeVertices,cubeIndexVertexBuffer,pickBuffer,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer, x, y) {
     let depthTexture = device.createTexture({
         label: 'Depth texture',
         size: [canvasTexture.width, canvasTexture.height],
@@ -379,8 +369,9 @@ async function getWorldMouseClick(canvasTexture,device,worldPipeline,cubeVertexB
 
     pass.setPipeline(worldPipeline);
     pass.setBindGroup(0, matrixBindGroup);
-    pass.setVertexBuffer(0, cubeVertexBuffer);
-    pass.draw(cubeVertices.length/6);
+    pass.setVertexBuffer(0, cubeIndexVertexBuffer);
+    console.log(indexCubeVertices.length)
+    pass.draw(indexCubeVertices.length/7);
 
     pass.end()
 
@@ -406,228 +397,8 @@ async function getWorldMouseClick(canvasTexture,device,worldPipeline,cubeVertexB
     device.queue.submit([commandBuffer]);
 
     await pickBuffer.mapAsync(GPUMapMode.READ);
-    const values = new Uint8Array(pickBuffer.getMappedRange());
-    console.log("Values:" + values[0] + ","+ values[1] + ","+ values[2] + "," + values[3]);
+    const values = new Uint32Array(pickBuffer.getMappedRange());
+    console.log(values)
+    console.log("Values:" + values[0] + ","+ values[1] + ","+ values[2] + "," + values[3] + "," + values[4]);
     pickBuffer.unmap();
 }
-
-function getCubeVertices() {
-
-    const block = Object.freeze({
-        air: 0,
-        dirt: 1,
-    })
-
-    const maxX = 3;
-    const maxY = 3;
-    const maxZ = 3;
-
-    // world is just an array, first 3 correspend to width,
-    // next correspond to length
-    // next*next correspond to height
-    const world = [
-        block.dirt, block.air, block.dirt,
-        block.dirt, block.air, block.dirt,
-        block.air, block.air, block.dirt,
-        block.air, block.air, block.air,
-        block.dirt, block.air, block.air,
-        block.air, block.air, block.air,
-        block.dirt, block.air, block.dirt,
-        block.dirt, block.dirt, block.air,
-        block.dirt, block.air, block.air
-    ]
-
-    var vertices = [];
-
-
-    // Now need to figure out how to populate a list of verticies
-    // from this
-
-    // We are assuming that blocks have a length of 1 here, right?
-    for (let currZ = 0; currZ < maxZ; currZ++) { // z
-        for (let currY = 0; currY < maxX; currY++) { // y
-            for (let currX = 0; currX < maxY; currX++) { // x
-                let blockLoc = currX + currY*maxY + currZ * maxY * maxX;
-                let blockType = world[blockLoc]
-                if (blockType == block.air) {
-                    continue;
-                }
-
-                // starting position
-                let position = [currX, currY, currZ]
-
-                // Need to check top, bottom, left, right, front and back are air blocks
-                // or out of range
-
-                // The issue here is that if it is at the edges then the value should 
-                // be out of bounds not in bounds, so it should return being out of 
-                // bounds
-
-                let blockTopLoc =  currX + (currY+1)*maxY + (currZ) * maxY * maxX;
-                if (isEmpty(blockTopLoc, world) || outOfBounds([currX, currY+1, currZ], maxX, maxY,maxZ)) {
-                    // draw surface
-                    vertices = vertices.concat([
-                        position[0]+-0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 1,
-                        position[0]+0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 1,
-                        position[0]+0.5, position[1]+ 0.5,  position[2]+0.5, 1, 0, 1,
-                        position[0]+0.5,  position[1]+0.5,  position[2]+0.5, 1, 0, 1,
-                        position[0]+-0.5,  position[1]+0.5,  position[2]+0.5, 1, 0, 1,
-                        position[0]+-0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 1
-                    ]);
-                }
-
-                let blockBottomLoc =  currX + (currY-1)*maxY + (currZ) * maxY * maxX;
-                if (isEmpty(blockBottomLoc, world) || outOfBounds([currX, currY-1, currZ], maxX, maxY,maxZ)) {
-                    // draw surface
-                    vertices =vertices.concat([
-                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5, 0, 1, 1,
-                        position[0]+0.5, position[1]+-0.5, position[2]+-0.5, 0, 1, 1,
-                        position[0]+0.5, position[1]+-0.5,  position[2]+0.5, 0, 1, 1,
-                
-                        position[0]+0.5, position[1]+-0.5,  position[2]+0.5, 0, 1, 1,
-                        position[0]+-0.5, position[1]+-0.5,  position[2]+0.5, 0, 1, 1,
-                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5, 0, 1, 1,
-                    ])
-                }
-
-                let blockFrontLoc =  (currX) + currY*maxY + (currZ+1) * maxY * maxX;
-                if (isEmpty(blockFrontLoc, world) || outOfBounds([currX, currY, currZ+1], maxX, maxY,maxZ)) {
-                    // draw surface
-                    vertices =vertices.concat([
-                        position[0]+-0.5, position[1]+-0.5,  position[2]+0.5, 0, 0, 1,
-                        position[0]+0.5, position[1]+-0.5, position[2]+ 0.5, 0, 0, 1,
-                        position[0]+0.5,  position[1]+0.5,  position[2]+0.5, 0, 0, 1,
-                        position[0]+0.5,  position[1]+0.5,  position[2]+0.5, 0, 0, 1,
-                        position[0]+-0.5,  position[1]+0.5,  position[2]+0.5, 0, 0, 1,
-                        position[0]+-0.5, position[1]+-0.5,  position[2]+0.5, 0, 0, 1,
-                    ])
-                }
-
-                let blockBackLoc =  currX + currY*maxY + (currZ-1) * maxY * maxX;
-                if (isEmpty(blockBackLoc, world) || outOfBounds([currX, currY, currZ-1], maxX, maxY,maxZ)) {
-                    // draw surface
-                    vertices =vertices.concat([
-                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5,  1, 0, 0,
-                        position[0]+0.5, position[1]+-0.5, position[2]+-0.5, 1, 0, 0,
-                        position[0]+0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 0,
-                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5, 1, 0, 0,
-                        position[0]+0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 0,
-                        position[0]+-0.5,  position[1]+0.5, position[2]+-0.5, 1, 0, 0,
-                    ])
-                }
-                
-                let blockRightLoc = currX+1 + (currY)*maxY + currZ * maxY * maxX;
-                if (isEmpty(blockRightLoc, world) || outOfBounds([currX+1, currY, currZ], maxX, maxY,maxZ)) {
-                    // draw surface
-                    vertices =vertices.concat([
-                        position[0]+0.5,  position[1]+0.5,  position[2]+0.5, 1, 1, 0,
-                        position[0]+0.5,  position[1]+0.5, position[2]+-0.5, 1, 1, 0,
-                        position[0]+0.5, position[1]+-0.5, position[2]+-0.5, 1, 1, 0,
-                        position[0]+0.5, position[1]+-0.5, position[2]+-0.5, 1, 1, 0,
-                        position[0]+0.5, position[1]+-0.5,  position[2]+0.5, 1, 1, 0,
-                        position[0]+0.5, position[1]+ 0.5,  position[2]+0.5, 1, 1, 0,                
-                    ])
-                }
-
-                let blockLeftLoc =  currX-1 + (currY)*maxY + currZ * maxY * maxX;
-                if (isEmpty(blockLeftLoc, world) || outOfBounds([currX-1, currY, currZ], maxX, maxY,maxZ)) {
-                    // draw surface
-                    vertices =vertices.concat([
-                        position[0]+-0.5,  position[1]+0.5,  position[2]+0.5, 0, 1, 0,
-                        position[0]+-0.5,  position[1]+0.5, position[2]+-0.5, 0, 1, 0,
-                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5, 0, 1, 0,
-                        position[0]+-0.5, position[1]+-0.5, position[2]+-0.5, 0, 1, 0,
-                        position[0]+-0.5, position[1]+-0.5,  position[2]+0.5, 0, 1, 0,
-                        position[0]+-0.5,  position[1]+0.5,  position[2]+0.5, 0, 1, 0,
-                    ])
-                }
-
-            }
-        }
-    }
-
-    function outOfBounds(position, maxX, maxY, maxZ) {
-        if (position[0] >= maxX || position[0] < 0) {
-            return true;
-        }
-        if (position[1] >= maxY || position[1] < 0) {
-            return true;
-        }
-        if (position[2] >= maxZ || position[2] < 0) {
-            return true;
-        }
-        return false;
-    }
-
-
-    function isEmpty(index, world) {
-        if (index < 0) {
-            return true
-        }
-        if (index >= maxY *maxX *maxZ) {
-            return true
-        }
-
-        if (world[index] == block.air) {
-            return true
-        }
-        return false;
-    }
-
-    const verticies = [
-        // Back
-        -0.5, -0.5, -0.5,  1, 0, 0,
-        0.5, -0.5, -0.5, 1, 0, 0,
-        0.5,  0.5, -0.5, 1, 0, 0,
-        -0.5, -0.5, -0.5, 1, 0, 0,
-        0.5,  0.5, -0.5, 1, 0, 0,
-        -0.5,  0.5, -0.5, 1, 0, 0,
-
-        // Front
-        -0.5, -0.5,  0.5, 0, 0, 1,
-        0.5, -0.5,  0.5, 0, 0, 1,
-        0.5,  0.5,  0.5, 0, 0, 1,
-        0.5,  0.5,  0.5, 0, 0, 1,
-        -0.5,  0.5,  0.5, 0, 0, 1,
-        -0.5, -0.5,  0.5, 0, 0, 1,
-
-        // Left
-        -0.5,  0.5,  0.5, 0, 1, 0,
-        -0.5,  0.5, -0.5, 0, 1, 0,
-        -0.5, -0.5, -0.5, 0, 1, 0,
-        -0.5, -0.5, -0.5, 0, 1, 0,
-        -0.5, -0.5,  0.5, 0, 1, 0,
-        -0.5,  0.5,  0.5, 0, 1, 0,
-
-        // Right
-        0.5,  0.5,  0.5, 1, 1, 0,
-        0.5,  0.5, -0.5, 1, 1, 0,
-        0.5, -0.5, -0.5, 1, 1, 0,
-        0.5, -0.5, -0.5, 1, 1, 0,
-        0.5, -0.5,  0.5, 1, 1, 0,
-        0.5,  0.5,  0.5, 1, 1, 0,
-
-        // Bottom
-        -0.5, -0.5, -0.5, 0, 1, 1,
-        0.5, -0.5, -0.5, 0, 1, 1,
-        0.5, -0.5,  0.5, 0, 1, 1,
-
-        0.5, -0.5,  0.5, 0, 1, 1,
-        -0.5, -0.5,  0.5, 0, 1, 1,
-        -0.5, -0.5, -0.5, 0, 1, 1,
-
-        // top
-        -0.5,  0.5, -0.5, 1, 0, 1,
-        0.5,  0.5, -0.5, 1, 0, 1,
-        0.5,  0.5,  0.5, 1, 0, 1,
-        0.5,  0.5,  0.5, 1, 0, 1,
-        -0.5,  0.5,  0.5, 1, 0, 1,
-        -0.5,  0.5, -0.5, 1, 0, 1,
-    ]
-    
-    return new Float32Array(vertices);
-}
-
-
-
-

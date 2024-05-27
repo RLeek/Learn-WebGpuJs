@@ -51,7 +51,6 @@ export const camera = class {
         this.front[2] = Math.sin(this.yaw) * Math.cos(this.pitch)
         this.front = vec3.normalize(this.front)
         this.right = vec3.normalize(vec3.cross(this.front, this.up));
-        console.log(this.pitch);
     }
 
     getViewMatrix() {
