@@ -51,14 +51,14 @@ function getWorldPipeline(device) {
                     arrayStride: 7*4,
                     attributes: [
                         {shaderLocation: 0, offset:0, format: 'float32x3'},
-                        {shaderLocation: 1, offset:12, format: 'uint32x4'}
+                        {shaderLocation: 1, offset:12, format: 'float32x4'}
                     ]
                 }
             ],
         },
         fragment: {
             module: worldModule,
-            targets: [{ format: 'rgba8uint'}]
+            targets: [{ format: 'rgba32float'}]
         },
         depthStencil: {
             depthWriteEnabled: true,
@@ -184,7 +184,7 @@ async function main() {
     // Buffer for results of clicking
     // Can be defined later
     const pickBuffer = device.createBuffer({
-        size: 3 * 4,
+        size: 4 * 4,
         usage: GPUBufferUsage.MAP_READ | GPUBufferUsage.COPY_DST,
     });
     
@@ -330,7 +330,7 @@ async function getWorldMouseClick(canvasTexture,device,worldPipeline,indexCubeVe
     let selectionTexture = device.createTexture({
         label: 'Selection texture',
         size: [canvasTexture.width, canvasTexture.height],
-        format: 'rgba8uint',
+        format: 'rgba32float',
         usage: GPUTextureUsage.COPY_SRC |GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
