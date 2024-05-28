@@ -48,17 +48,22 @@ function getWorldPipeline(device) {
             module: worldModule,
             buffers: [
                 {
-                    arrayStride: 7*4,
+                    arrayStride: 3*4,
                     attributes: [
-                        {shaderLocation: 0, offset:0, format: 'float32x3'},
-                        {shaderLocation: 1, offset:12, format: 'float32x4'}
+                        {shaderLocation: 0, offset:0, format: 'float32x3'}, //vertex
+                    ]
+                },
+                {
+                    arrayStride: 2*4,
+                    attributes: [
+                        {shaderLocation: 1, offset:0, format: 'uint32x2'} // index + normal value(??)
                     ]
                 }
             ],
         },
         fragment: {
             module: worldModule,
-            targets: [{ format: 'rgba32float'}]
+            targets: [{ format: 'rg32uint'}]
         },
         depthStencil: {
             depthWriteEnabled: true,
@@ -83,10 +88,15 @@ function getCubePipeline(device, presentationFormat) {
             module: cubeModule,
             buffers: [
                 {
-                    arrayStride: 6*4,
+                    arrayStride: 3*4,
                     attributes: [
-                        {shaderLocation: 0, offset:0, format: 'float32x3'},
-                        {shaderLocation: 1, offset:12, format: 'float32x3'}
+                        {shaderLocation: 0, offset:0, format: 'float32x3'} // vertex
+                    ]
+                }, 
+                {
+                    arrayStride:3*4,
+                    attributes: [
+                        {shaderLocation:1, offset:0, format: 'float32x3'} // color 
                     ]
                 }
             ],
@@ -121,13 +131,15 @@ async function main() {
     const cubePipeline = getCubePipeline(device, presentationFormat)
 
     // Initialize world here
-    const voxelWorld = new world(20, 20, 20);
-    const cubeVertices = voxelWorld.getVertices();
-    const indexCubeVertices = voxelWorld.getIndexVertices();
+    const voxelWorld = new world(5, 5, 5);
+    let cubeVertices = voxelWorld.getVertices();
+    let cubeColor = voxelWorld.getColorVertices();
+
+    let cubeIndex = voxelWorld.getIndexVertices();
 
     
     // Creates shared vertex buffer
-    const cubeVertexBuffer = device.createBuffer({
+    var cubeVertexBuffer = device.createBuffer({
         label: 'cubeVertexBuffer',
         size: cubeVertices.byteLength,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
@@ -135,15 +147,22 @@ async function main() {
     
     device.queue.writeBuffer(cubeVertexBuffer, 0, cubeVertices)
     
-    // Creates shared vertex buffer
-    const cubeIndexVertexBuffer = device.createBuffer({
-        label: 'cubeIndexVertexBuffer',
-        size: indexCubeVertices.byteLength,
+    var cubeColorBuffer = device.createBuffer({
+        label: 'cubeVertexBuffer',
+        size: cubeColor.byteLength,
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
     
-    device.queue.writeBuffer(cubeIndexVertexBuffer, 0, indexCubeVertices)
+    device.queue.writeBuffer(cubeColorBuffer, 0, cubeColor)
+
+
+    var cubeIndexBuffer = device.createBuffer({
+        label: 'cubeVertexBuffer',
+        size: cubeIndex.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
     
+    device.queue.writeBuffer(cubeIndexBuffer, 0, cubeIndex)
 
     // Creates shared model matrix
     const modelUniformBuffer = device.createBuffer({
@@ -259,7 +278,8 @@ async function main() {
         pass.setPipeline(cubePipeline);
         pass.setBindGroup(0, matrixBindGroup);
         pass.setVertexBuffer(0, cubeVertexBuffer);
-        pass.draw(cubeVertices.length/6);
+        pass.setVertexBuffer(1, cubeColorBuffer);
+        pass.draw(cubeVertices.length/3);
 
         pass.end()
 
@@ -272,10 +292,38 @@ async function main() {
     // Create event listener (Note: This requires a bunch of vars to be provided at the end so that we can 
     // trigger the correct funcions)
     canvas.addEventListener('mousedown', async event => {
+        if (event.button == 2) {
+            return;
+        }
         const bb = canvas.getBoundingClientRect();
         const x = Math.floor((event.clientX - bb.left)/bb.width * canvas.width)
         const y = Math.floor((event.clientY-bb.top)/ bb.height * canvas.height)
-        await getWorldMouseClick(canvas,device,worldPipeline, indexCubeVertices, cubeIndexVertexBuffer,pickBuffer,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer, x, y);
+        let values = await getWorldMouseClick(canvas,device,worldPipeline, cubeIndex, cubeIndexBuffer, cubeVertices, cubeVertexBuffer,pickBuffer,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer, x, y);
+        voxelWorld.removeBlock(values[0])
+        console.log(values)
+        cubeVertices = voxelWorld.getVertices();
+        cubeColor = voxelWorld.getColorVertices();
+        cubeIndex = voxelWorld.getIndexVertices();
+
+        cubeVertexBuffer = device.createBuffer({
+            label: 'cubeVertexBuffer',
+            size: cubeVertices.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+        cubeColorBuffer = device.createBuffer({
+            label: 'cubeVertexBuffer',
+            size: cubeColor.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+        cubeIndexBuffer = device.createBuffer({
+            label: 'cubeVertexBuffer',
+            size: cubeIndex.byteLength,
+            usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        });
+        device.queue.writeBuffer(cubeVertexBuffer, 0, cubeVertices)
+        device.queue.writeBuffer(cubeColorBuffer, 0, cubeColor)
+        device.queue.writeBuffer(cubeIndexBuffer, 0, cubeIndex)
+
     })
 
 
@@ -312,15 +360,12 @@ const observer = new ResizeObserver(async entries=> {
 // observer.observe(canvas);
 
 
-
-
-
 main();
 
 
 
 
-async function getWorldMouseClick(canvasTexture,device,worldPipeline,indexCubeVertices,cubeIndexVertexBuffer,pickBuffer,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer, x, y) {
+async function getWorldMouseClick(canvasTexture,device,worldPipeline,cubeIndex,cubeIndexBuffer, cubeVertices, cubeVertexBuffer,pickBuffer,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer, x, y) {
     let depthTexture = device.createTexture({
         label: 'Depth texture',
         size: [canvasTexture.width, canvasTexture.height],
@@ -330,7 +375,7 @@ async function getWorldMouseClick(canvasTexture,device,worldPipeline,indexCubeVe
     let selectionTexture = device.createTexture({
         label: 'Selection texture',
         size: [canvasTexture.width, canvasTexture.height],
-        format: 'rgba32float',
+        format: 'rg32uint',
         usage: GPUTextureUsage.COPY_SRC |GPUTextureUsage.RENDER_ATTACHMENT,
     });
 
@@ -369,9 +414,9 @@ async function getWorldMouseClick(canvasTexture,device,worldPipeline,indexCubeVe
 
     pass.setPipeline(worldPipeline);
     pass.setBindGroup(0, matrixBindGroup);
-    pass.setVertexBuffer(0, cubeIndexVertexBuffer);
-    console.log(indexCubeVertices.length)
-    pass.draw(indexCubeVertices.length/7);
+    pass.setVertexBuffer(0, cubeVertexBuffer);
+    pass.setVertexBuffer(1, cubeIndexBuffer);
+    pass.draw(cubeVertices.length/3);
 
     pass.end()
 
@@ -398,7 +443,7 @@ async function getWorldMouseClick(canvasTexture,device,worldPipeline,indexCubeVe
 
     await pickBuffer.mapAsync(GPUMapMode.READ);
     const values = new Uint32Array(pickBuffer.getMappedRange());
-    console.log(values)
-    console.log("Values:" + values[0] + ","+ values[1] + ","+ values[2] + "," + values[3] + "," + values[4]);
+    var value1 = [values[0], values[1]]
     pickBuffer.unmap();
+    return value1
 }

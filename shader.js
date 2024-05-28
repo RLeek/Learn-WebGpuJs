@@ -35,13 +35,13 @@ export const worldShaderCode=
 
 struct vs_output {
     @builtin(position) position: vec4f,
-    @location(0) @interpolate(flat) color:vec4f
+    @location(0) @interpolate(flat) color:vec2u
 };
 
 
 @vertex fn vs(
     @location(0) vertex:vec3f,
-    @location(1) color:vec4f,
+    @location(1) color:vec2u,
 ) -> vs_output {
     var output: vs_output;
     output.position = projection* view * model*vec4(vertex,1.0);
@@ -49,7 +49,7 @@ struct vs_output {
     return output;
 }
 
-@fragment fn fs(output:vs_output) -> @location(0) vec4f	 {
+@fragment fn fs(output:vs_output) -> @location(0) vec2u {
     return output.color;
 }
 
