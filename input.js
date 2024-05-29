@@ -4,6 +4,7 @@
 
 
 export const inputHandler = {
+    removeBlock: true,
     wPressed: false,
     sPressed: false,
     dPressed: false,

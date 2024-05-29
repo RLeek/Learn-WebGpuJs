@@ -9,7 +9,7 @@ export const world = class {
         this.zLength = zLength
         this.world = Array(this.xLength * this.yLength * this.zLength).fill(block.dirt)
         this.sides = [vec3.create(0, 1, 0), vec3.create(0,-1,0), vec3.create(0,0,1), vec3.create(0,0,-1), vec3.create(1,0,0), vec3.create(-1,0,0)]
-        this.color = [vec3.create(1, 0, 1), vec3.create(0,1,1), vec3.create(0,0,1), vec3.create(1,0,0), vec3.create(1,1,0), vec3.create(0,1,0)]
+        //this.color = [vec3.create(1, 0, 1), vec3.create(0,1,1), vec3.create(0,0,1), vec3.create(1,0,0), vec3.create(1,1,0), vec3.create(0,1,0)]
         this.normal = [1,3,4,2,6,5]
         this.sidesVertices = [
             [
@@ -154,7 +154,19 @@ export const world = class {
                             continue;
                         }
                         for (var vertex of this.sidesVertices[index]) {
-                            vertices = vertices.concat([this.color[index][0], this.color[index][1],this.color[index][2]])
+                            if (blockType == block.dirt) {
+                                vertices = vertices.concat([0.5764, 0.2784, 0.2039])
+                            } else if (blockType == block.grass) {
+                                vertices = vertices.concat([0.5215, 0.6745, 0.1960])
+                            } else if (blockType == block.sand) {
+                                vertices = vertices.concat([0.5215, 0.6745, 0.1960])
+                            } else if (blockType == block.stone) {
+                                vertices = vertices.concat([0.5215, 0.6745, 0.1960])
+                            } else if (blockType == block.wood) {
+                                vertices = vertices.concat([0.5215, 0.6745, 0.1960])
+                            } else if (blockType == block.leaf) {
+                                vertices = vertices.concat([0.5215, 0.6745, 0.1960])
+                            }
                         }
                         index+=1
                     }
@@ -223,7 +235,7 @@ export const world = class {
         }
 
         if (this.isEmpty(worldPos)) {
-            this.world[worldPos[0]  + worldPos[1] * this.xLength + worldPos[2] * this.xLength * this.yLength] = block.dirt
+            this.world[worldPos[0]  + worldPos[1] * this.xLength + worldPos[2] * this.xLength * this.yLength] = block.grass
         }
 
 
