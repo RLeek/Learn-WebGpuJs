@@ -44,6 +44,7 @@ function getWorldPipeline(device) {
     const worldPipeline = device.createRenderPipeline({
         label: 'Cube Pipeline',
         layout: 'auto',
+
         vertex: {
             module: worldModule,
             buffers: [
@@ -189,7 +190,7 @@ async function main() {
     device.queue.writeBuffer(modelUniformBuffer, 0, modelMatrix)
     
     // Initialize camera
-    const worldCamera = new camera([0,0,6], 60 * Math.PI / 180,canvas.width / canvas.height, 0.1, 1000);
+    const worldCamera = new camera([5,3,15], 60 * Math.PI / 180,canvas.width / canvas.height, 0.1, 1000);
     
     window.addEventListener('keydown', (e)=> inputHandler.setKeyPressed(e, inputHandler))
     window.addEventListener('keyup', (e)=> inputHandler.setKeyReleased(e, inputHandler))
