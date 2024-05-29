@@ -1,7 +1,18 @@
 <!DOCTYPE html>
 <body >
-    <canvas oncontextmenu="return false;" style="height:80vh;width:80vw;"></canvas>
-    <div style="height:80px;width:80px;background-color: gray;" id="actionToggle">Remove Block</div>
+    <canvas oncontextmenu="return false;" style="height:90vh;width:90vw;"></canvas>
+
+
+    <div style="display:flex;">
+        <div style="height:80px;width:80px;background-color: gray;border: 5px solid white;" id="actionToggle">Remove Block</div>
+        <div style="height:80px;width:80px;background-color: brown; border: 5px solid lightblue;" id="dirt"> dirt </div>
+        <div style="height:80px;width:80px;background-color: green;border: 5px solid white;" id="grass"> grass </div>
+        <div style="height:80px;width:80px;background-color: yellow;border: 5px solid white;" id="sand"> sand </div>
+        <div style="height:80px;width:80px;background-color: gray;border: 5px solid white;" id="stone"> stone </div>
+        <div style="height:80px;width:80px;background-color: brown;border: 5px solid white;" id="wood"> wood </div>
+        <div style="height:80px;width:80px;background-color: lightgreen;border: 5px solid white;" id="leaf"> leaf </div>
+        <div style="height:80px;width:80px;background-color: blue;border: 5px solid white;" id="water"> water </div>
+    </div>
     <script src="ui.js" type="module"></script>
     <script src="voxelWorldShader.js" type="module"></script>
     <script src="world.js" type="module"></script>
@@ -12,3 +23,5 @@
     <script src="main.js" type="module"></script>
 
 </body>
+
+

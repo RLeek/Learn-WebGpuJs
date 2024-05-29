@@ -1,9 +1,11 @@
 // Set listener that then sets the key value
 // Then use that to transform camera
+import { block } from './blocks.js'
 
 
 
 export const inputHandler = {
+    blockSelected: block.dirt,
     removeBlock: true,
     wPressed: false,
     sPressed: false,

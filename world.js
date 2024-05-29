@@ -7,9 +7,18 @@ export const world = class {
         this.xLength = xLength
         this.yLength = yLength
         this.zLength = zLength
-        this.world = Array(this.xLength * this.yLength * this.zLength).fill(block.dirt)
+        this.world = Array(this.xLength * this.yLength * this.zLength).fill(block.air)
+        for (let currZ = 0; currZ < this.zLength; currZ++) { // z
+            for (let currX = 0; currX < this.xLength; currX++) { // x
+                let blockLoc = currX + currZ * this.yLength * this.xLength
+                this.world[blockLoc] = block.stone
+            }
+        
+        }
+
+
         this.sides = [vec3.create(0, 1, 0), vec3.create(0,-1,0), vec3.create(0,0,1), vec3.create(0,0,-1), vec3.create(1,0,0), vec3.create(-1,0,0)]
-        //this.color = [vec3.create(1, 0, 1), vec3.create(0,1,1), vec3.create(0,0,1), vec3.create(1,0,0), vec3.create(1,1,0), vec3.create(0,1,0)]
+        this.color = [1.0, 0.2, 0.4, 0.5, 0.6, 0.7]
         this.normal = [1,3,4,2,6,5]
         this.sidesVertices = [
             [
@@ -155,17 +164,19 @@ export const world = class {
                         }
                         for (var vertex of this.sidesVertices[index]) {
                             if (blockType == block.dirt) {
-                                vertices = vertices.concat([0.5764, 0.2784, 0.2039])
+                                vertices = vertices.concat([0.5764 * this.color[index], 0.2784 * this.color[index], 0.2039 * this.color[index]])
                             } else if (blockType == block.grass) {
-                                vertices = vertices.concat([0.5215, 0.6745, 0.1960])
+                                vertices = vertices.concat([0.5215 * this.color[index], 0.6745 * this.color[index], 0.1960 * this.color[index]])
                             } else if (blockType == block.sand) {
-                                vertices = vertices.concat([0.5215, 0.6745, 0.1960])
+                                vertices = vertices.concat([0.9411 * this.color[index], 0.925 * this.color[index], 0.3568 * this.color[index]])
                             } else if (blockType == block.stone) {
-                                vertices = vertices.concat([0.5215, 0.6745, 0.1960])
+                                vertices = vertices.concat([0.3568 * this.color[index], 0.3607 * this.color[index], 0.3529 * this.color[index]])
                             } else if (blockType == block.wood) {
-                                vertices = vertices.concat([0.5215, 0.6745, 0.1960])
+                                vertices = vertices.concat([0.5411 * this.color[index], 0.451 * this.color[index], 0.3686 * this.color[index]])
                             } else if (blockType == block.leaf) {
-                                vertices = vertices.concat([0.5215, 0.6745, 0.1960])
+                                vertices = vertices.concat([0.572 * this.color[index], 0.9215 * this.color[index], 0.5411 * this.color[index]])
+                            } else if (blockType == block.water) {
+                                vertices = vertices.concat([0.4117 * this.color[index], 0.7803 * this.color[index], 0.9411 * this.color[index]])
                             }
                         }
                         index+=1
@@ -200,7 +211,7 @@ export const world = class {
         return false;
     }
 
-    addBlock(index, normal) {
+    addBlock(index, normal, block) {
         console.log(index, normal)
         // convert index into x, y, z
         // Then determine the normal transformation
@@ -211,6 +222,8 @@ export const world = class {
         let worldPos = [index %this.xLength, ~~(index /this.xLength) %this.yLength, ~~(index / (this.xLength * this.yLength))]
         console.log("WORLD POSITION:")
         console.log(worldPos)
+        console.log("BLOCKTYPE")
+        console.log(block)
     
         if (normal == 1) { // y +1
             worldPos[1] +=1        
@@ -235,7 +248,7 @@ export const world = class {
         }
 
         if (this.isEmpty(worldPos)) {
-            this.world[worldPos[0]  + worldPos[1] * this.xLength + worldPos[2] * this.xLength * this.yLength] = block.grass
+            this.world[worldPos[0]  + worldPos[1] * this.xLength + worldPos[2] * this.xLength * this.yLength] = block
         }
 
 

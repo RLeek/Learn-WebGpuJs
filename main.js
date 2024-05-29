@@ -121,6 +121,18 @@ async function main() {
     const canvas = document.querySelector('canvas');
     const context =  getContext();
 
+    const observer = new ResizeObserver(entries => {
+        for (const entry of entries) {
+          const canvas = entry.target;
+          const width = entry.contentBoxSize[0].inlineSize;
+          const height = entry.contentBoxSize[0].blockSize;
+          canvas.width = Math.max(1, Math.min(width, device.limits.maxTextureDimension2D));
+          canvas.height = Math.max(1, Math.min(height, device.limits.maxTextureDimension2D));
+          // re-render
+        }
+    });
+    observer.observe(canvas);
+
     const presentationFormat = navigator.gpu.getPreferredCanvasFormat();
     context.configure({
         device,
@@ -131,7 +143,7 @@ async function main() {
     const cubePipeline = getCubePipeline(device, presentationFormat)
 
     // Initialize world here
-    const voxelWorld = new world(5, 10, 3);
+    const voxelWorld = new world(10, 10, 10);
     let cubeVertices = voxelWorld.getVertices();
     let cubeColor = voxelWorld.getColorVertices();
 
@@ -300,10 +312,14 @@ async function main() {
         const y = Math.floor((event.clientY-bb.top)/ bb.height * canvas.height)
         let values = await getWorldMouseClick(canvas,device,worldPipeline, cubeIndex, cubeIndexBuffer, cubeVertices, cubeVertexBuffer,pickBuffer,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer, x, y);
         
+        if (values[1] == 0) {
+            return;
+        }
+
         if (inputHandler.removeBlock) {
             voxelWorld.removeBlock(values[0])
         } else {
-            voxelWorld.addBlock(values[0], values[1])
+            voxelWorld.addBlock(values[0], values[1], inputHandler.blockSelected)
         }
         console.log(values)
         cubeVertices = voxelWorld.getVertices();

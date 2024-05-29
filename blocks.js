@@ -6,4 +6,5 @@ export const block = Object.freeze({
     stone: 4, 
     wood: 5,
     leaf: 6,
+    water: 7,
 })
