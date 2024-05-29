@@ -61,6 +61,7 @@ export const world = class {
     }
 
     removeBlock(index) {
+        console.log("Is this being called?")
         this.world[index] = block.air
     }
     // place block of arbitrary color ( need to embed color in block (fairly easy))
@@ -71,9 +72,9 @@ export const world = class {
     getVertices() {
         let vertices = []
         for (let currZ = 0; currZ < this.zLength; currZ++) { // z
-            for (let currY = 0; currY < this.xLength; currY++) { // y
-                for (let currX = 0; currX < this.yLength; currX++) { // x
-                    let blockType = this.world[currX + currY*this.yLength + currZ * this.yLength * this.xLength]
+            for (let currY = 0; currY < this.yLength; currY++) { // y
+                for (let currX = 0; currX < this.xLength; currX++) { // x
+                    let blockType = this.world[currX + currY*this.xLength + currZ * this.yLength * this.xLength]
                     if (blockType == block.air) {
                         continue;
                     }
@@ -104,9 +105,9 @@ export const world = class {
     getIndexVertices() {
         let vertices = []
         for (let currZ = 0; currZ < this.zLength; currZ++) { // z
-            for (let currY = 0; currY < this.xLength; currY++) { // y
-                for (let currX = 0; currX < this.yLength; currX++) { // x
-                    let blockIndex = currX + currY*this.yLength + currZ * this.yLength * this.xLength
+            for (let currY = 0; currY < this.yLength; currY++) { // y
+                for (let currX = 0; currX < this.xLength; currX++) { // x
+                    let blockIndex = currX + currY*this.xLength + currZ * this.yLength * this.xLength
                     let blockType = this.world[blockIndex]
                     if (blockType == block.air) {
                         continue;
@@ -136,9 +137,9 @@ export const world = class {
     getColorVertices() {
         let vertices = []
         for (let currZ = 0; currZ < this.zLength; currZ++) { // z
-            for (let currY = 0; currY < this.xLength; currY++) { // y
-                for (let currX = 0; currX < this.yLength; currX++) { // x
-                    let blockType = this.world[currX + currY*this.yLength + currZ * this.yLength * this.xLength]
+            for (let currY = 0; currY < this.yLength; currY++) { // y
+                for (let currX = 0; currX < this.xLength; currX++) { // x
+                    let blockType = this.world[currX + currY*this.xLength + currZ * this.yLength * this.xLength]
                     if (blockType == block.air) {
                         continue;
                     }
@@ -179,12 +180,53 @@ export const world = class {
     }
 
     isEmpty(blockPos) {
-        const index = blockPos[0] + blockPos[1]*this.yLength + blockPos[2] * this.yLength * this.xLength
+        const index = blockPos[0] + blockPos[1]*this.xLength + blockPos[2] * this.yLength * this.xLength
         //console.log(index)
         if (this.world[index] == block.air) {
             return true
         }
         return false;
+    }
+
+    addBlock(index, normal) {
+        console.log(index, normal)
+        // convert index into x, y, z
+        // Then determine the normal transformation
+        // determine whether it is out of bounds or empty
+
+        // Do relevant action as required
+
+        let worldPos = [index %this.xLength, ~~(index /this.xLength) %this.yLength, ~~(index / (this.xLength * this.yLength))]
+        console.log("WORLD POSITION:")
+        console.log(worldPos)
+    
+        if (normal == 1) { // y +1
+            worldPos[1] +=1        
+        } else if (normal == 3) { // y-1
+            worldPos[1] -=1        
+
+        } else if (normal == 4) { // z +1
+            worldPos[2] +=1        
+
+        } else if (normal == 2) { // z-1
+            worldPos[2] -=1        
+
+        } else if (normal == 6) { // x +1
+            worldPos[0] +=1        
+
+        } else if (normal == 5) { // x -1
+            worldPos[0] -=1        
+        }
+
+        if (this.outOfBounds(worldPos)) {
+            return;
+        }
+
+        if (this.isEmpty(worldPos)) {
+            this.world[worldPos[0]  + worldPos[1] * this.xLength + worldPos[2] * this.xLength * this.yLength] = block.dirt
+        }
+
+
     }
 
 

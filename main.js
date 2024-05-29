@@ -131,7 +131,7 @@ async function main() {
     const cubePipeline = getCubePipeline(device, presentationFormat)
 
     // Initialize world here
-    const voxelWorld = new world(5, 5, 5);
+    const voxelWorld = new world(5, 10, 3);
     let cubeVertices = voxelWorld.getVertices();
     let cubeColor = voxelWorld.getColorVertices();
 
@@ -299,7 +299,12 @@ async function main() {
         const x = Math.floor((event.clientX - bb.left)/bb.width * canvas.width)
         const y = Math.floor((event.clientY-bb.top)/ bb.height * canvas.height)
         let values = await getWorldMouseClick(canvas,device,worldPipeline, cubeIndex, cubeIndexBuffer, cubeVertices, cubeVertexBuffer,pickBuffer,modelUniformBuffer,viewUniformBuffer,projectionUniformBuffer, x, y);
-        voxelWorld.removeBlock(values[0])
+        
+        if (inputHandler.removeBlock) {
+            voxelWorld.removeBlock(values[0])
+        } else {
+            voxelWorld.addBlock(values[0], values[1])
+        }
         console.log(values)
         cubeVertices = voxelWorld.getVertices();
         cubeColor = voxelWorld.getColorVertices();
