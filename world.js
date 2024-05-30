@@ -78,6 +78,51 @@ export const world = class {
 
     // Need seperate color that simply provides
     // indexPos
+
+    getBoundaryVertices() {
+        let vertices = [];
+        // Top
+        vertices = vertices.concat([-0.5,-0.5,-0.5])
+        vertices = vertices.concat([this.xLength-0.5,-0.5,-0.5])
+
+        vertices = vertices.concat([-0.5,-0.5,-0.5])
+        vertices = vertices.concat([-0.5,this.yLength-0.5,-0.5])
+ 
+        vertices = vertices.concat([-0.5,-0.5,-0.5])
+        vertices = vertices.concat([-0.5,-0.5,this.zLength-0.5])
+
+        vertices = vertices.concat([this.xLength-0.5,-0.5,-0.5])
+        vertices = vertices.concat([this.xLength-0.5,-0.5,this.zLength-0.5])
+
+        vertices = vertices.concat([this.xLength-0.5,-0.5,-0.5])
+        vertices = vertices.concat([this.xLength-0.5,this.yLength-0.5,-0.5])
+
+        vertices = vertices.concat([-0.5,this.yLength-0.5,-0.5])
+        vertices = vertices.concat([this.xLength-0.5,this.yLength-0.5,-0.5])
+
+        vertices = vertices.concat([-0.5,this.yLength-0.5,-0.5])
+        vertices = vertices.concat([-0.5,this.yLength-0.5,this.zLength-0.5])
+
+        vertices = vertices.concat([-0.5,-0.5,this.zLength-0.5])
+        vertices = vertices.concat([-0.5,this.yLength-0.5,this.zLength-0.5])
+
+        vertices = vertices.concat([-0.5,-0.5,this.zLength-0.5])
+        vertices = vertices.concat([this.xLength-0.5,-0.5,this.zLength-0.5])
+
+        vertices = vertices.concat([this.xLength-0.5,-0.5,this.zLength-0.5])
+        vertices = vertices.concat([this.xLength-0.5,this.yLength-0.5,this.zLength-0.5])
+
+        vertices = vertices.concat([this.xLength-0.5,this.yLength-0.5,-0.5])
+        vertices = vertices.concat([this.xLength-0.5,this.yLength-0.5,this.zLength-0.5])
+
+        vertices = vertices.concat([-0.5,this.yLength-0.5,this.zLength-0.5])
+        vertices = vertices.concat([this.xLength-0.5,this.yLength-0.5,this.zLength-0.5])
+
+
+        return new Float32Array(vertices);
+
+    }
+
     getVertices() {
         let vertices = []
         for (let currZ = 0; currZ < this.zLength; currZ++) { // z

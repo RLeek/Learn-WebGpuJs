@@ -1,5 +1,5 @@
 
-import { cubeShaderCode, worldShaderCode } from './shader.js'
+import { cubeShaderCode, worldShaderCode, lineShaderCode } from './shader.js'
 import { camera } from './camera.js'
 import { vec3, mat4 } from 'https://wgpu-matrix.org/dist/2.x/wgpu-matrix.module.js';
 import { inputHandler } from './input.js';
@@ -34,6 +34,42 @@ function getContext() {
     // Textures
         // Render pass descriptor 
 
+
+function getLinePipeline(device, presentationFormat) {
+    const worldModule = device.createShaderModule({
+        label: "line Shader",
+        code: lineShaderCode
+    })
+
+    const worldPipeline = device.createRenderPipeline({
+        label: 'line Pipeline',
+        layout: 'auto',
+        primitive: {
+            topology: 'line-list'
+        },
+        vertex: {
+            module: worldModule,
+            buffers: [
+                {
+                    arrayStride: 3*4,
+                    attributes: [
+                        {shaderLocation: 0, offset:0, format: 'float32x3'}, //vertex
+                    ]
+                }
+            ],
+        },
+        fragment: {
+            module: worldModule,
+            targets:[{ format: presentationFormat}]
+        },
+        depthStencil: {
+            depthWriteEnabled: true,
+            depthCompare: 'less',
+            format: 'depth24plus',
+        },
+    })
+    return worldPipeline;
+}
 
 function getWorldPipeline(device) {
     const worldModule = device.createShaderModule({
@@ -142,15 +178,25 @@ async function main() {
     
     const worldPipeline = getWorldPipeline(device)
     const cubePipeline = getCubePipeline(device, presentationFormat)
+    const linePipeline = getLinePipeline(device, presentationFormat)
 
     // Initialize world here
     const voxelWorld = new world(10, 10, 10);
     let cubeVertices = voxelWorld.getVertices();
     let cubeColor = voxelWorld.getColorVertices();
-
+    let boundaryVerticies = voxelWorld.getBoundaryVertices();
     let cubeIndex = voxelWorld.getIndexVertices();
 
     
+    var boundaryVertexBuffer = device.createBuffer({
+        label: 'boundaryVertexBuffer',
+        size: boundaryVerticies.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    
+    device.queue.writeBuffer(boundaryVertexBuffer, 0, boundaryVerticies)
+
+
     // Creates shared vertex buffer
     var cubeVertexBuffer = device.createBuffer({
         label: 'cubeVertexBuffer',
@@ -286,7 +332,7 @@ async function main() {
             ]
         })
         const encoder = device.createCommandEncoder({label: 'Our encoder'});
-        const pass = encoder.beginRenderPass(renderPassDescriptor);
+        let pass = encoder.beginRenderPass(renderPassDescriptor);
 
         pass.setPipeline(cubePipeline);
         pass.setBindGroup(0, matrixBindGroup);
@@ -296,10 +342,43 @@ async function main() {
 
         pass.end()
 
+
+        const linePassDescriptor = {
+            label: 'Our render pass',
+            colorAttachments: [
+                {
+                    loadOp: 'load',
+                    storeOp: 'store',
+                    view: canvasView
+                }
+            ],
+            depthStencilAttachment: {
+                depthClearValue: 1.0,
+                depthLoadOp: 'load',
+                depthStoreOp: 'store',
+                view: depthview
+            }
+        }
+        const lineBindGroup = device.createBindGroup({
+            label: 'matrix bind group',
+            layout: linePipeline.getBindGroupLayout(0),
+            entries: [
+                { binding: 0, resource: { buffer: modelUniformBuffer}},
+                { binding: 1, resource: { buffer: viewUniformBuffer}},
+                { binding: 2, resource: { buffer: projectionUniformBuffer}}
+            ]
+        })
+
+        //device.createCommandEncoder({label: 'Our encoder'});
+        pass = encoder.beginRenderPass(linePassDescriptor)
+        pass.setPipeline(linePipeline);
+        pass.setBindGroup(0, lineBindGroup);
+        pass.setVertexBuffer(0, boundaryVertexBuffer);
+        pass.draw(boundaryVerticies.length/3);
+        pass.end()
+
         const commandBuffer = encoder.finish();
         device.queue.submit([commandBuffer]);
-
-
     }
     
     // Create event listener (Note: This requires a bunch of vars to be provided at the end so that we can 
