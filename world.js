@@ -222,6 +222,8 @@ export const world = class {
                                 vertices = vertices.concat([0.572 * this.color[index], 0.9215 * this.color[index], 0.5411 * this.color[index]])
                             } else if (blockType == block.water) {
                                 vertices = vertices.concat([0.4117 * this.color[index], 0.7803 * this.color[index], 0.9411 * this.color[index]])
+                            } else if (blockType == block.snow) {
+                                vertices = vertices.concat([0.8313 * this.color[index], 0.9215 * this.color[index], 0.9294 * this.color[index]])
                             }
                         }
                         index+=1

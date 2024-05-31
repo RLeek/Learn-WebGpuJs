@@ -63,3 +63,14 @@ input[type=checkbox] {
     transform: translateY(3px) translateX(3px);
 
 }
+
+.sidebar {
+    width:15%
+}
+
+@media (min-width: 1536px) {
+    .sidebar {
+        width:10%
+    }
+    
+}

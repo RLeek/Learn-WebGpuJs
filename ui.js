@@ -10,6 +10,8 @@ const stoneButton = document.getElementById("stone")
 const woodButton = document.getElementById("wood")
 const leafButton = document.getElementById("leaf")
 const waterButton = document.getElementById("water")
+const snowButton = document.getElementById("snow")
+
 const toggleBoundary = document.getElementById("toggleBoundary")
 const resetCameraButton = document.getElementById("resetCamera")
 
@@ -77,6 +79,13 @@ waterButton.addEventListener('click', (e) => {
     inputHandler.blockSelected = block.water
     currentlySelected.classList.remove("selectedToolButton")
     currentlySelected = waterButton
+    currentlySelected.classList.add("selectedToolButton")
+});
+
+snowButton.addEventListener('click', (e) => {
+    inputHandler.blockSelected = block.snow
+    currentlySelected.classList.remove("selectedToolButton")
+    currentlySelected = snowButton
     currentlySelected.classList.add("selectedToolButton")
 });
 
