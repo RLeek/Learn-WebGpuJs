@@ -68,9 +68,16 @@ input[type=checkbox] {
     width:15%
 }
 
+.maincontent {
+    width: 85%
+}
+
 @media (min-width: 1536px) {
     .sidebar {
         width:10%
     }
     
+    .maincontent {
+        width: 90%
+    }
 }
