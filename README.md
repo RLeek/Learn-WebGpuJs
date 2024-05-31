@@ -14,6 +14,10 @@ Link:
 
 To run locally, simply run http-server and open localhost in a browser with WebGPU support
 
+Demo of current state:
+
+![demo](Animation.gif)
+
 Potential future features include:
 - Support for 20x20x20 voxel worlds and beyond, through improving performance + using chunks for voxel worlds
 - Arbitrary colors for blocks + eyedropper tool for referencing previously used colors
