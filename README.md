@@ -8,7 +8,9 @@ Features include:
 - Supports free-moving camera using WASD and right-click to pan
 - Removing and adding voxels using left-click with tools
 
-Link: voxels.arkanlily.dev (Requires chrome or firefox nightly build)
+Link:
+
+[voxels.arkanlily.dev](https://voxels.arkanlily.dev/) (Requires chrome or firefox nightly build)
 
 To run locally, simply run http-server and open localhost in a browser with WebGPU support
 
