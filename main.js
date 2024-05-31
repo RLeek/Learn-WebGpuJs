@@ -151,6 +151,9 @@ function getCubePipeline(device, presentationFormat) {
     return cubePipeline;
 }
 
+const canvas = document.querySelector('canvas');
+export const worldCamera = new camera([5,3,15], 60 * Math.PI / 180,canvas.width / canvas.height, 0.1, 1000);
+
 
 async function main() {
 
@@ -234,10 +237,7 @@ async function main() {
     modelMatrix = mat4.translate(modelMatrix, [0,0,0]);
     
     device.queue.writeBuffer(modelUniformBuffer, 0, modelMatrix)
-    
-    // Initialize camera
-    const worldCamera = new camera([5,3,15], 60 * Math.PI / 180,canvas.width / canvas.height, 0.1, 1000);
-    
+        
     window.addEventListener('keydown', (e)=> inputHandler.setKeyPressed(e, inputHandler))
     window.addEventListener('keyup', (e)=> inputHandler.setKeyReleased(e, inputHandler))
     canvas.addEventListener('mousemove', (e)=> inputHandler.setMouseMoveInfo(e, inputHandler))
@@ -342,41 +342,42 @@ async function main() {
 
         pass.end()
 
+        if (inputHandler.showBoundary) {
 
-        const linePassDescriptor = {
-            label: 'Our render pass',
-            colorAttachments: [
+            const linePassDescriptor = {
+                label: 'Our render pass',
+                colorAttachments: [
                 {
                     loadOp: 'load',
                     storeOp: 'store',
                     view: canvasView
+                }],
+                depthStencilAttachment: {
+                    depthClearValue: 1.0,
+                    depthLoadOp: 'load',
+                    depthStoreOp: 'store',
+                    view: depthview
                 }
-            ],
-            depthStencilAttachment: {
-                depthClearValue: 1.0,
-                depthLoadOp: 'load',
-                depthStoreOp: 'store',
-                view: depthview
             }
+            const lineBindGroup = device.createBindGroup({
+                label: 'matrix bind group',
+                layout: linePipeline.getBindGroupLayout(0),
+                entries: [
+                    { binding: 0, resource: { buffer: modelUniformBuffer}},
+                    { binding: 1, resource: { buffer: viewUniformBuffer}},
+                    { binding: 2, resource: { buffer: projectionUniformBuffer}}
+                ]
+            })
+
+            //device.createCommandEncoder({label: 'Our encoder'});
+            pass = encoder.beginRenderPass(linePassDescriptor)
+            pass.setPipeline(linePipeline);
+            pass.setBindGroup(0, lineBindGroup);
+            pass.setVertexBuffer(0, boundaryVertexBuffer);
+            pass.draw(boundaryVerticies.length/3);
+            pass.end()
+
         }
-        const lineBindGroup = device.createBindGroup({
-            label: 'matrix bind group',
-            layout: linePipeline.getBindGroupLayout(0),
-            entries: [
-                { binding: 0, resource: { buffer: modelUniformBuffer}},
-                { binding: 1, resource: { buffer: viewUniformBuffer}},
-                { binding: 2, resource: { buffer: projectionUniformBuffer}}
-            ]
-        })
-
-        //device.createCommandEncoder({label: 'Our encoder'});
-        pass = encoder.beginRenderPass(linePassDescriptor)
-        pass.setPipeline(linePipeline);
-        pass.setBindGroup(0, lineBindGroup);
-        pass.setVertexBuffer(0, boundaryVertexBuffer);
-        pass.draw(boundaryVerticies.length/3);
-        pass.end()
-
         const commandBuffer = encoder.finish();
         device.queue.submit([commandBuffer]);
     }

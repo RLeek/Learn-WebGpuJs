@@ -5,8 +5,9 @@ import { block } from './blocks.js'
 
 
 export const inputHandler = {
-    blockSelected: block.dirt,
-    removeBlock: true,
+    showBoundary: true,
+    blockSelected: block.stone,
+    removeBlock: false,
     wPressed: false,
     sPressed: false,
     dPressed: false,
